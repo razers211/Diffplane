@@ -374,7 +374,7 @@ services:
     restart: unless-stopped
 
   prometheus:
-    image: docker.io/prom/prometheus:v3.15.0@sha256:efd719c99d83b060d9daefdcf00360461adf279f45ef5391f8d111892118753e
+    image: docker.io/prom/prometheus:v3.16.0@sha256:e04987641b57704f408e31f6373ba4138ecf27cb4a165d24aabb6c38fddd0f06
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ./prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
@@ -390,7 +390,7 @@ services:
   # Receives Prometheus' alerts; receiver from the GUI. No published port: list alerts with
   # amtool inside the container (docs/operations.md, Alerts).
   alertmanager:
-    image: docker.io/prom/alertmanager:v0.34.1@sha256:e9733bafb1bdef9b00e25a21f8f99dc26a22224bf16641ad754d1649f4c3357a
+    image: docker.io/prom/alertmanager:v0.35.0@sha256:e638797febd034838eca8b98cdbd46f951e9bf7f178777aa8669167406a9946c
     # Its configuration is the orchestrator's (receiver set in the GUI, orchestrator/alerting.py).
     command: ["--config.file=/config/alertmanager.yml", "--storage.path=/alertmanager"]
     volumes:
@@ -430,7 +430,7 @@ services:
 
   directory-radius:
     profiles: ["directory-test"]
-    image: docker.io/freeradius/freeradius-server:3.2.3@sha256:1ca67fbd54c319029750051671341f5ea96b9bb5ea76198e81548593b4d41a70
+    image: docker.io/freeradius/freeradius-server:3.2.10@sha256:337856ea35b77472f15dad159064ce46219a54b499bef5f6a7cba38aefd39fe9
     volumes:
       - ./directory-test/clients.conf:/etc/raddb/clients.conf:ro
       - ./directory-test/authorize:/etc/raddb/mods-config/files/authorize:ro

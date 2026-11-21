@@ -1,20 +1,53 @@
 version: 2
+# One grouped pull request per ecosystem and directory each week. Major versions of what the
+# platform pins on purpose are planned upgrades, never automatic: Python and the Annet stack (the
+# rulebook depends on their exact versions), Node and TypeScript (the GUI build), ClickHouse (the
+# flows data), Alpine for keepalived (the VIP's iptables behaviour was proven on 3.20).
+# Security updates are separate: Settings > Code security > Dependabot security updates.
 updates:
   - package-ecosystem: pip
     directory: /
     schedule: {interval: weekly}
     open-pull-requests-limit: 5
+    groups:
+      python: {patterns: ["*"]}
+    ignore:
+      - dependency-name: "annet"
+      - dependency-name: "gnetcli_adapter"
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: npm
     directory: /gui
     schedule: {interval: weekly}
     open-pull-requests-limit: 5
+    groups:
+      gui: {patterns: ["*"]}
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: github-actions
     directory: /
     schedule: {interval: weekly}
+    groups:
+      actions: {patterns: ["*"]}
   # Docker image tags and digests: Dockerfiles and Compose files.
   - package-ecosystem: docker
     directories: [/orchestrator, /deploy/ztp, /deploy/ha/patroni, /deploy/ha/keepalived]
     schedule: {interval: weekly}
+    groups:
+      images: {patterns: ["*"]}
+    ignore:
+      - dependency-name: "python"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      - dependency-name: "node"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "library/alpine"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
   - package-ecosystem: docker-compose
     directories: [/deploy, /deploy/ha]
     schedule: {interval: weekly}
+    groups:
+      compose: {patterns: ["*"]}
+    ignore:
+      - dependency-name: "clickhouse/clickhouse-server"
+        update-types: ["version-update:semver-major"]

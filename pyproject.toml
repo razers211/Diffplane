@@ -8,9 +8,9 @@ version = "0.1.0"
 requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.115",
-    "httpx>=0.27",
-    "uvicorn>=0.30",
-    "pyyaml>=6",
+    "httpx>=0.28.1",
+    "uvicorn>=0.54.0",
+    "pyyaml>=6.0.3",
     # Pinned: generator output and patch behaviour depend on the exact Annet rulebook.
     "annet[netbox]==4.6.14",
     "gnetcli_adapter==2.8.5",
@@ -21,7 +21,7 @@ dependencies = [
     "prometheus_client==0.26.0",
     "sqlalchemy[asyncio]==2.1.3",
     "asyncpg==0.31.0",
-    "alembic==1.20.0",
+    "alembic==1.20.1",
 ]
 
 [project.optional-dependencies]
