@@ -30,7 +30,7 @@ RUN git clone --quiet --depth 1 --branch ${GOFLOW2_VERSION} https://github.com/n
  && CGO_ENABLED=0 go build -o /out/goflow2 ./cmd/goflow2
 
 # GUI: built once here, served by the orchestrator at /ui/.
-FROM docker.io/node:24-bookworm-slim@sha256:c86ecead9e55a5210ac1727de38a4ca840bf03dcaf34dc9749addbf383b1920c AS gui
+FROM docker.io/node:26-bookworm-slim@sha256:5df79989ed685e09f0a98019db4cebfb22fb9df1a53c0161664a011f7ff6b0f1 AS gui
 WORKDIR /gui
 COPY gui/package.json gui/package-lock.json ./
 RUN npm ci --no-audit --no-fund
