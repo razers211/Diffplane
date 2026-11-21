@@ -1,0 +1,66 @@
+# Example centralized fabric whose gateway pair is the two spines: an M-LAG pair of
+# spines (peer-link, a server trunk towards the firewall, shared VTEP) that also reflects
+# routes for the leaves. 2 layer 2 leaf pairs. Device names carry an "s-" prefix (names are
+# unique across fabrics). Models and port names are placeholders based on the lab switch.
+fabric:
+  name: example-central-spines
+  asn: 65003
+  architecture: centralized
+  gateway_pair: [s-spine1, s-spine2]
+  prefixes:
+    loopback: 10.30.0.0/24
+    vtep: 10.30.1.0/24
+    p2p: 10.31.0.0/24
+    mlag_bypass: 10.32.0.0/24
+    gateways: 10.130.0.0/16
+  mlag:
+    bypass_vlan: 4093
+  gateway_mac: 0000-5e00-0103
+
+services:
+  ntp_servers: [192.0.2.1, 192.0.2.2]   # placeholders (TEST-NET-1)
+  snmp:
+    location: example-central-spines-dc
+    contact: noc@example.com
+
+spines:
+  - name: s-spine1
+    model: CE6881H-48S6CQ
+  - name: s-spine2
+    model: CE6881H-48S6CQ
+
+spine_pair:
+  spines: [s-spine1, s-spine2]
+  peer_link:
+    trunk: 0
+    members: [100GE1/0/5, 100GE1/0/6]
+  mlag_trunks:
+    - trunk: 1                          # towards the firewall
+      members: [10GE1/0/1]
+
+leaf_pairs:
+  - leaves: [s-leaf1, s-leaf2]
+    model: CE6881H-48S6CQ
+    role: leaf
+    peer_link:
+      trunk: 0
+      members: [100GE1/0/5, 100GE1/0/6]
+    mlag_trunks:
+      - trunk: 1
+        members: [10GE1/0/1]
+  - leaves: [s-leaf3, s-leaf4]
+    model: CE6881H-48S6CQ
+    role: leaf
+    peer_link:
+      trunk: 0
+      members: [100GE1/0/5, 100GE1/0/6]
+
+links:
+  - {spine: s-spine1, spine_port: 100GE1/0/1, leaf: s-leaf1, leaf_port: 100GE1/0/1}
+  - {spine: s-spine1, spine_port: 100GE1/0/2, leaf: s-leaf2, leaf_port: 100GE1/0/1}
+  - {spine: s-spine1, spine_port: 100GE1/0/3, leaf: s-leaf3, leaf_port: 100GE1/0/1}
+  - {spine: s-spine1, spine_port: 100GE1/0/4, leaf: s-leaf4, leaf_port: 100GE1/0/1}
+  - {spine: s-spine2, spine_port: 100GE1/0/1, leaf: s-leaf1, leaf_port: 100GE1/0/2}
+  - {spine: s-spine2, spine_port: 100GE1/0/2, leaf: s-leaf2, leaf_port: 100GE1/0/2}
+  - {spine: s-spine2, spine_port: 100GE1/0/3, leaf: s-leaf3, leaf_port: 100GE1/0/2}
+  - {spine: s-spine2, spine_port: 100GE1/0/4, leaf: s-leaf4, leaf_port: 100GE1/0/2}

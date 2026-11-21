@@ -1,0 +1,35 @@
+#!/bin/sh
+# The platform on an HA machine: renders ha/out/ from ha/node.env and ../.env, then runs
+# docker compose with this machine's files. Examples (from anywhere):
+#   deploy/ha/fabric-ha build                 pull and build every image, the active services' too (servers)
+#   deploy/ha/fabric-ha up -d                 start this machine's role
+#   deploy/ha/fabric-ha ps                    what runs here
+#   deploy/ha/fabric-ha patronictl list       the database cluster (servers)
+#   deploy/ha/fabric-ha switchover            planned move of the leader to the other server
+set -eu
+cd "$(dirname "$0")/.."
+python3 ha/render.py >&2
+node=$(sed -n 's/^HA_NODE=//p' ha/out/ha.env)
+if [ "$node" = witness ]; then
+    set -- docker compose --env-file .env --env-file ha/out/ha.env -f ha/witness.yaml "$@"
+else
+    # The orchestrator runs as nobody (65534) and writes its certificate into these bind mounts,
+    # which Docker would otherwise create owned by root.
+    if [ "$(stat -c %u ha/tls 2>/dev/null)" != 65534 ] || [ "$(stat -c %u ha/tls-public 2>/dev/null)" != 65534 ]; then
+        docker run --rm -v "$PWD/ha:/ha" docker.io/library/alpine:3.20 \
+            sh -c 'mkdir -p /ha/tls /ha/tls-public && chown -R 65534 /ha/tls /ha/tls-public && chmod 700 /ha/tls && chmod 755 /ha/tls-public'
+    fi
+    case "${1:-}" in
+        patronictl) shift; set -- docker compose --env-file .env --env-file ha/out/ha.env -f compose.yaml -f ha/server.yaml \
+                        exec patroni patronictl -c /etc/patroni.yml "$@" ;;
+        switchover) shift; set -- docker compose --env-file .env --env-file ha/out/ha.env -f compose.yaml -f ha/server.yaml \
+                        exec patroni patronictl -c /etc/patroni.yml switchover fabric "$@" ;;
+        # The agent starts the active profile with --no-build --pull never: its images must already be here.
+        build) shift; docker compose --env-file .env --env-file ha/out/ha.env -f compose.yaml -f ha/server.yaml \
+                   --profile active pull --ignore-buildable
+               set -- docker compose --env-file .env --env-file ha/out/ha.env -f compose.yaml -f ha/server.yaml \
+                   --profile active build "$@" ;;
+        *) set -- docker compose --env-file .env --env-file ha/out/ha.env -f compose.yaml -f ha/server.yaml "$@" ;;
+    esac
+fi
+exec "$@"

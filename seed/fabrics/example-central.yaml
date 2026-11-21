@@ -1,0 +1,69 @@
+# Example centralized fabric: 2 spines, a border-leaf M-LAG pair holding every gateway,
+# 2 layer 2 leaf pairs. Device names are unique across fabrics, hence the "c-" prefix.
+# Models and port names are placeholders based on the lab switch (CE6881H-48S6CQ).
+fabric:
+  name: example-central
+  asn: 65002
+  architecture: centralized   # gateways on gateway_pair only; the other leaves are layer 2
+  gateway_pair: [c-gw1, c-gw2]
+  prefixes:
+    loopback: 10.20.0.0/24
+    vtep: 10.20.1.0/24
+    p2p: 10.21.0.0/24
+    mlag_bypass: 10.22.0.0/24
+    gateways: 10.120.0.0/16
+  mlag:
+    bypass_vlan: 4093
+  gateway_mac: 0000-5e00-0102
+
+services:
+  ntp_servers: [192.0.2.1, 192.0.2.2]   # placeholders (TEST-NET-1)
+  snmp:
+    location: example-central-dc
+    contact: noc@example.com
+
+spines:
+  - name: c-spine1
+    model: CE6881H-48S6CQ
+  - name: c-spine2
+    model: CE6881H-48S6CQ
+
+leaf_pairs:
+  - leaves: [c-gw1, c-gw2]
+    model: CE6881H-48S6CQ
+    role: border-leaf
+    peer_link:
+      trunk: 0
+      members: [100GE1/0/5, 100GE1/0/6]
+    mlag_trunks:
+      - trunk: 1                          # towards the firewall
+        members: [10GE1/0/1]
+  - leaves: [c-leaf1, c-leaf2]
+    model: CE6881H-48S6CQ
+    role: leaf
+    peer_link:
+      trunk: 0
+      members: [100GE1/0/5, 100GE1/0/6]
+    mlag_trunks:
+      - trunk: 1
+        members: [10GE1/0/1]
+  - leaves: [c-leaf3, c-leaf4]
+    model: CE6881H-48S6CQ
+    role: leaf
+    peer_link:
+      trunk: 0
+      members: [100GE1/0/5, 100GE1/0/6]
+
+links:
+  - {spine: c-spine1, spine_port: 100GE1/0/1, leaf: c-gw1, leaf_port: 100GE1/0/1}
+  - {spine: c-spine1, spine_port: 100GE1/0/2, leaf: c-gw2, leaf_port: 100GE1/0/1}
+  - {spine: c-spine1, spine_port: 100GE1/0/3, leaf: c-leaf1, leaf_port: 100GE1/0/1}
+  - {spine: c-spine1, spine_port: 100GE1/0/4, leaf: c-leaf2, leaf_port: 100GE1/0/1}
+  - {spine: c-spine1, spine_port: 100GE1/0/5, leaf: c-leaf3, leaf_port: 100GE1/0/1}
+  - {spine: c-spine1, spine_port: 100GE1/0/6, leaf: c-leaf4, leaf_port: 100GE1/0/1}
+  - {spine: c-spine2, spine_port: 100GE1/0/1, leaf: c-gw1, leaf_port: 100GE1/0/2}
+  - {spine: c-spine2, spine_port: 100GE1/0/2, leaf: c-gw2, leaf_port: 100GE1/0/2}
+  - {spine: c-spine2, spine_port: 100GE1/0/3, leaf: c-leaf1, leaf_port: 100GE1/0/2}
+  - {spine: c-spine2, spine_port: 100GE1/0/4, leaf: c-leaf2, leaf_port: 100GE1/0/2}
+  - {spine: c-spine2, spine_port: 100GE1/0/5, leaf: c-leaf3, leaf_port: 100GE1/0/2}
+  - {spine: c-spine2, spine_port: 100GE1/0/6, leaf: c-leaf4, leaf_port: 100GE1/0/2}

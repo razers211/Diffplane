@@ -1,0 +1,47 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+*.egg-info/
+build/
+dist/
+deploy/.env
+deploy/.env.*
+!deploy/.env.example
+*.pem
+*.key
+*.p12
+id_rsa*
+# Raw device data saved by probes, for local inspection only
+probe-data/
+gui/node_modules/
+gui/dist/
+# Database and media backups: contain API tokens and password hashes
+deploy/backups/
+# The orchestrator's self-signed certificate, saved for curl (public, but per installation)
+deploy/fabric.crt
+deploy/directory-test/certs/
+
+# Vendor documentation and YANG models (not ours to publish)
+/*.pdf
+/H_series_tor_*/
+# HA: this machine's addresses, rendered configs (passwords), the shared certificate
+deploy/ha/node.env
+deploy/ha/out/
+deploy/ha/tls/
+deploy/ha/tls-public/
+
+# Local tooling and editor files, never in the repo
+/.agents/
+/.claude/
+/skills-lock.json
+/CLAUDE.local.md
+/floorplan/
+/graphify-out/
+*.kate-swp
+
+# Contributor and agent notes, kept out of the published branch (they live on dev)
+CLAUDE.md
+PLAN.md
+AGENTS.md
+/.impeccable/

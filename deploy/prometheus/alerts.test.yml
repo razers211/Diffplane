@@ -1,0 +1,231 @@
+# promtool test rules for the hardware, control-plane and anomaly alerts. leaf1's values from the probe: PWR:1/1 without
+# input, optics without fibre (-40 dBm) in ports that are not in use, sensors well under their thresholds.
+# Run it (docs/operations.md, Alerts):
+#   sudo docker compose run --rm --no-deps -v ./prometheus:/rules:ro --entrypoint promtool prometheus test rules /rules/alerts.test.yml
+rule_files:
+  - alerts.yml
+
+evaluation_interval: 30s
+
+tests:
+  - name: leaf1 as it is - only the unfed power module alarms
+    interval: 30s
+    input_series:
+      - series: 'fabric_power_module_up{job="collector",device="leaf1",module="PWR:1/1"}'
+        values: '0x10'
+      - series: 'fabric_power_module_up{job="collector",device="leaf1",module="PWR:1/2"}'
+        values: '1x10'
+      - series: 'fabric_fan_present{job="collector",device="leaf1",fan="FAN:1/1"}'
+        values: '1x10'
+      - series: 'fabric_temperature_celsius{job="collector",device="leaf1",slot="1",sensor="TEMP_A"}'
+        values: '28x10'
+      - series: 'fabric_temperature_threshold_celsius{job="collector",device="leaf1",slot="1",sensor="TEMP_A",level="minor"}'
+        values: '70x10'
+      - series: 'fabric_temperature_sensor_normal{job="collector",device="leaf1",slot="1",sensor="TEMP_A"}'
+        values: '1x10'
+      # 10GE1/0/5: a module without fibre in a port not in use; 100GE1/0/1 is in use, without a module.
+      - series: 'fabric_optic_rx_power_dbm{job="collector",device="leaf1",interface="10GE1/0/5",channel="0"}'
+        values: '-40x10'
+      - series: 'fabric_optic_threshold{job="collector",device="leaf1",interface="10GE1/0/5",measure="rx_power",level="low_alarm"}'
+        values: '-11.9x10'
+      - series: 'fabric_optic_threshold{job="collector",device="leaf1",interface="10GE1/0/5",measure="rx_power",level="high_alarm"}'
+        values: '1x10'
+      - series: 'fabric_port_in_use{job="orchestrator",device="leaf1",interface="100GE1/0/1"}'
+        values: '1x10'
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: FabricPowerModuleFailed
+        exp_alerts:
+          - exp_labels: {severity: critical, job: collector, device: leaf1, module: "PWR:1/1"}
+            exp_annotations:
+              summary: "leaf1: power module PWR:1/1 is not normal"
+              description: "No input or a failed module: the switch runs on its other supply. See its Hardware tab."
+      - eval_time: 3m
+        alertname: FabricFanMissing
+      - eval_time: 3m
+        alertname: FabricTemperatureHigh
+      - eval_time: 3m
+        alertname: FabricOpticRxPower   # unused modules never alarm
+
+  - name: an optic without light on a port in use, a hot sensor, a missing fan
+    interval: 30s
+    input_series:
+      - series: 'fabric_optic_rx_power_dbm{job="collector",device="leaf1",interface="10GE1/0/5",channel="0"}'
+        values: '-40x10'
+      - series: 'fabric_optic_tx_power_dbm{job="collector",device="leaf1",interface="10GE1/0/5",channel="0"}'
+        values: '-2.04x10'
+      - series: 'fabric_optic_temperature_celsius{job="collector",device="leaf1",interface="10GE1/0/5"}'
+        values: '21.82x10'
+      - series: 'fabric_optic_threshold{job="collector",device="leaf1",interface="10GE1/0/5",measure="rx_power",level="low_alarm"}'
+        values: '-11.9x10'
+      - series: 'fabric_optic_threshold{job="collector",device="leaf1",interface="10GE1/0/5",measure="rx_power",level="high_alarm"}'
+        values: '1x10'
+      - series: 'fabric_optic_threshold{job="collector",device="leaf1",interface="10GE1/0/5",measure="tx_power",level="low_alarm"}'
+        values: '-9.3x10'
+      - series: 'fabric_optic_threshold{job="collector",device="leaf1",interface="10GE1/0/5",measure="tx_power",level="high_alarm"}'
+        values: '1x10'
+      - series: 'fabric_optic_threshold{job="collector",device="leaf1",interface="10GE1/0/5",measure="temperature",level="high_alarm"}'
+        values: '80x10'
+      - series: 'fabric_port_in_use{job="orchestrator",device="leaf1",interface="10GE1/0/5"}'
+        values: '1x10'
+      - series: 'fabric_temperature_celsius{job="collector",device="leaf1",slot="1",sensor="NP1"}'
+        values: '46 46 104x8'
+      - series: 'fabric_temperature_threshold_celsius{job="collector",device="leaf1",slot="1",sensor="NP1",level="minor"}'
+        values: '103x10'
+      - series: 'fabric_fan_present{job="collector",device="leaf1",fan="FAN:1/2"}'
+        values: '0x10'
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: FabricOpticRxPower   # pending: 2 minutes first
+      - eval_time: 3m
+        alertname: FabricOpticRxPower
+        exp_alerts:
+          - exp_labels: {severity: critical, job: collector, device: leaf1, interface: "10GE1/0/5", channel: "0"}
+            exp_annotations:
+              summary: "leaf1 10GE1/0/5: received light -40 dBm past the module's alarm threshold"
+              description: "No light (fibre, far end down) or too much. See the switch's Ports tab."
+      - eval_time: 3m
+        alertname: FabricOpticTxPower
+      - eval_time: 3m
+        alertname: FabricOpticTemperature
+      - eval_time: 4m
+        alertname: FabricTemperatureHigh
+        exp_alerts:
+          - exp_labels: {severity: warning, job: collector, device: leaf1, slot: "1", sensor: NP1}
+            exp_annotations:
+              summary: "leaf1: temperature sensor NP1 (slot 1) is hot"
+              description: "At or over the switch's own Minor threshold. See its Hardware tab."
+      - eval_time: 3m
+        alertname: FabricFanMissing
+        exp_alerts:
+          - exp_labels: {severity: critical, job: collector, device: leaf1, fan: "FAN:1/2"}
+            exp_annotations:
+              summary: "leaf1: fan FAN:1/2 is missing"
+              description: "The switch reports the fan as not present. See its Hardware tab."
+
+  - name: leaf1's partners are planned - their peers down never alarm
+    interval: 30s
+    input_series:
+      - series: 'fabric_bgp_peer_up{job="collector",device="leaf1",vpn="_public_",peer="10.10.0.1",family="evpn"}'
+        values: '0x10'
+      - series: 'fabric_planned_address{job="orchestrator",peer="10.10.0.1"}'
+        values: '1x10'
+      - series: 'fabric_mlag_heartbeat_up{job="collector",device="leaf1"}'
+        values: '0x10'
+      - series: 'fabric_mlag_peer_link_up{job="collector",device="leaf1",interface="Eth-Trunk0"}'
+        values: '0x10'
+      - series: 'fabric_mlag_peer_planned{job="orchestrator",device="leaf1"}'
+        values: '1x10'
+    alert_rule_test:
+      - eval_time: 4m
+        alertname: FabricBgpPeerDown
+      - eval_time: 4m
+        alertname: FabricMlagHeartbeatLost
+      - eval_time: 4m
+        alertname: FabricMlagPeerLinkDown
+
+  - name: built partners down, errors rising on a port in use
+    interval: 1m
+    input_series:
+      - series: 'fabric_bgp_peer_up{job="collector",device="leaf1",vpn="_public_",peer="10.10.0.1",family="evpn"}'
+        values: '1 1 0x10'
+      - series: 'fabric_planned_address{job="orchestrator",peer="10.10.0.9"}'
+        values: '1x12'
+      - series: 'fabric_ospf_neighbor_up{job="collector",device="leaf1",vpn="_public_",interface="100GE1/0/1",neighbor="10.10.0.1",address="10.11.0.1"}'
+        values: '0x12'
+      - series: 'fabric_ospf_neighbor_up{job="collector",device="leaf1",vpn="_public_",interface="100GE1/0/2",neighbor="10.10.0.9",address="10.11.0.5"}'
+        values: '0x12'
+      - series: 'fabric_mlag_heartbeat_up{job="collector",device="leaf1"}'
+        values: '0x12'
+      - series: 'fabric_mlag_peer_link_up{job="collector",device="leaf1",interface="Eth-Trunk0"}'
+        values: '1x12'
+      # errors on a port in use grow every minute; on a free port they grow too but never alarm
+      - series: 'fabric_interface_in_errors_total{job="collector",device="leaf1",interface="10GE1/0/1"}'
+        values: '0+3x20'
+      - series: 'fabric_interface_out_errors_total{job="collector",device="leaf1",interface="10GE1/0/1"}'
+        values: '0x20'
+      - series: 'fabric_interface_in_errors_total{job="collector",device="leaf1",interface="10GE1/0/9"}'
+        values: '0+3x20'
+      - series: 'fabric_interface_out_errors_total{job="collector",device="leaf1",interface="10GE1/0/9"}'
+        values: '0x20'
+      - series: 'fabric_port_in_use{job="orchestrator",device="leaf1",interface="10GE1/0/1"}'
+        values: '1x20'
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: FabricBgpPeerDown   # down since 2m: still pending
+      - eval_time: 5m
+        alertname: FabricBgpPeerDown
+        exp_alerts:
+          - exp_labels: {severity: critical, job: collector, device: leaf1, vpn: _public_, peer: 10.10.0.1, family: evpn}
+            exp_annotations:
+              summary: "leaf1: BGP peer 10.10.0.1 (evpn, _public_) is down"
+              description: "Not established for 2 minutes. See the switch's Control plane tab."
+      - eval_time: 5m
+        alertname: FabricOspfNeighbourDown   # the neighbour at 10.10.0.9 is planned: only 10.10.0.1
+        exp_alerts:
+          - exp_labels: {severity: critical, job: collector, device: leaf1, vpn: _public_, interface: 100GE1/0/1,
+                         neighbor: 10.10.0.1, address: 10.11.0.1}
+            exp_annotations:
+              summary: "leaf1: OSPF neighbour 10.10.0.1 on 100GE1/0/1 is not Full"
+              description: "For 2 minutes. See the switch's Control plane tab."
+      - eval_time: 5m
+        alertname: FabricMlagHeartbeatLost
+        exp_alerts:
+          - exp_labels: {severity: critical, job: collector, device: leaf1}
+            exp_annotations:
+              summary: "leaf1: M-LAG heartbeat with its peer is lost"
+              description: "For 2 minutes. See the switch's Control plane tab."
+      - eval_time: 5m
+        alertname: FabricMlagPeerLinkDown
+      - eval_time: 16m
+        alertname: FabricInterfaceErrors
+        exp_alerts:
+          - exp_labels: {severity: warning, job: collector, device: leaf1, interface: 10GE1/0/1}
+            exp_annotations:
+              summary: "leaf1 10GE1/0/1: errors rising"
+              description: "Input or output errors keep growing (a dirty fibre, a bad cable or optic). See the switch's Ports tab."
+
+  - name: a traffic spike and a flapping link
+    interval: 1m
+    input_series:
+      - series: 'fabric_traffic_anomaly{job="orchestrator",device="leaf1",interface="Eth-Trunk1",direction="in",kind="high"}'
+        values: '_ _ 25000000x10'
+      - series: 'fabric_link_flapping{job="orchestrator",device="leaf1",interface="10GE1/0/3"}'
+        values: '3x10'
+    alert_rule_test:
+      - eval_time: 4m
+        alertname: FabricTrafficAnomaly   # anomalous since 2m: pending
+      - eval_time: 8m
+        alertname: FabricTrafficAnomaly
+        exp_alerts:
+          - exp_labels: {severity: warning, job: orchestrator, device: leaf1, interface: Eth-Trunk1, direction: in, kind: high}
+            exp_annotations:
+              summary: "leaf1 Eth-Trunk1: traffic in far above usual (25Mbit/s)"
+              description: "Its last 15 minutes against the same hour over the last 14 days. See Overview › Capacity."
+      - eval_time: 1m
+        alertname: FabricLinkFlapping
+        exp_alerts:
+          - exp_labels: {severity: critical, job: orchestrator, device: leaf1, interface: 10GE1/0/3}
+            exp_annotations:
+              summary: "leaf1 10GE1/0/3 is flapping (3 downs in 30 minutes)"
+              description: "A cable, optic or the far end keeps going down. See the switch's History tab."
+
+  - name: edge-port protection acts on a port
+    interval: 1m
+    input_series:
+      - series: 'fabric_port_protection_tripped{job="collector",device="leaf1",interface="10GE1/0/10",cause="loopback-detect",state="error-down",detail=""}'
+        values: '1x3'
+      - series: 'fabric_port_protection_tripped{job="collector",device="leaf1",interface="10GE1/0/1",cause="storm-control",state="block",detail="broadcast"}'
+        values: '1x3'
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: FabricPortProtectionTripped
+        exp_alerts:
+          - exp_labels: {severity: warning, job: collector, device: leaf1, interface: 10GE1/0/10, cause: loopback-detect, state: error-down}
+            exp_annotations:
+              summary: "leaf1 10GE1/0/10: a loop, port shut"
+              description: "Edge-port protection acted on a server port. See Network › Port protection."
+          - exp_labels: {severity: warning, job: collector, device: leaf1, interface: 10GE1/0/1, cause: storm-control, state: block, detail: broadcast}
+            exp_annotations:
+              summary: "leaf1 10GE1/0/1: a broadcast storm, excess dropped"
+              description: "Edge-port protection acted on a server port. See Network › Port protection."

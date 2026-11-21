@@ -1,0 +1,54 @@
+# Example fabric: 2 spines, 2 M-LAG leaf pairs.
+# Models and port names are placeholders based on the lab switch (CE6881H-48S6CQ).
+fabric:
+  name: example
+  asn: 65001                  # fabric ASN: iBGP EVPN, spines are route reflectors
+  prefixes:
+    loopback: 10.0.0.0/24     # LoopBack0 on every device, /32 each
+    vtep: 10.0.1.0/24         # LoopBack1 on leaves, one shared /32 per M-LAG pair
+    p2p: 10.1.0.0/24          # spine-leaf links, one /30 each
+    mlag_bypass: 10.2.0.0/24  # /30 per M-LAG pair on the bypass Vlanif
+    gateways: 10.100.0.0/16         # segment gateway subnets (/24 each by default)
+  mlag:
+    bypass_vlan: 4093         # Vlanif over the peer-link for the VXLAN bypass
+  gateway_mac: 0000-5e00-0101    # anycast gateway MAC on every VBDIF of the fabric
+
+# Fabric-wide settings, stored in NetBox as the site's "fabric" config context.
+services:
+  ntp_servers: [192.0.2.1, 192.0.2.2]   # placeholders (TEST-NET-1); replace with real servers
+  snmp:
+    location: example-dc
+    contact: noc@example.com
+
+spines:
+  - name: spine1
+    model: CE6881H-48S6CQ
+  - name: spine2
+    model: CE6881H-48S6CQ
+
+leaf_pairs:
+  - leaves: [leaf1, leaf2]
+    model: CE6881H-48S6CQ
+    role: leaf
+    peer_link:
+      trunk: 0
+      members: [100GE1/0/5, 100GE1/0/6]   # same ports on both leaves, cabled port to port
+    mlag_trunks:
+      - trunk: 1                          # M-LAG ID = trunk number
+        members: [10GE1/0/1]
+  - leaves: [leaf3, leaf4]
+    model: CE6881H-48S6CQ
+    role: leaf
+    peer_link:
+      trunk: 0
+      members: [100GE1/0/5, 100GE1/0/6]
+
+links:
+  - {spine: spine1, spine_port: 100GE1/0/1, leaf: leaf1, leaf_port: 100GE1/0/1}
+  - {spine: spine1, spine_port: 100GE1/0/2, leaf: leaf2, leaf_port: 100GE1/0/1}
+  - {spine: spine1, spine_port: 100GE1/0/3, leaf: leaf3, leaf_port: 100GE1/0/1}
+  - {spine: spine1, spine_port: 100GE1/0/4, leaf: leaf4, leaf_port: 100GE1/0/1}
+  - {spine: spine2, spine_port: 100GE1/0/1, leaf: leaf1, leaf_port: 100GE1/0/2}
+  - {spine: spine2, spine_port: 100GE1/0/2, leaf: leaf2, leaf_port: 100GE1/0/2}
+  - {spine: spine2, spine_port: 100GE1/0/3, leaf: leaf3, leaf_port: 100GE1/0/2}
+  - {spine: spine2, spine_port: 100GE1/0/4, leaf: leaf4, leaf_port: 100GE1/0/2}

@@ -1,0 +1,42 @@
+# HA witness (design): the third member of etcd (Patroni's quorum)
+# and of ClickHouse Keeper. Nothing else runs here. Start it through deploy/ha/fabric-ha.
+name: diffplane
+
+services:
+  etcd:
+    image: quay.io/coreos/etcd:v3.5.17@sha256:a055da833a7c013b836ed0822e8ec1f99b059658be255ad8d0fcd31b635ae3d6
+    command:
+      - etcd
+      - --name=${HA_NODE:?render with deploy/ha/fabric-ha}
+      - --data-dir=/etcd-data
+      - --listen-client-urls=http://0.0.0.0:2379
+      - --advertise-client-urls=http://${HA_NODE_IP}:2379
+      - --listen-peer-urls=http://0.0.0.0:2380
+      - --initial-advertise-peer-urls=http://${HA_NODE_IP}:2380
+      - --initial-cluster=${HA_ETCD_CLUSTER}
+      - --initial-cluster-token=${ETCD_TOKEN:?run gen_env.py --ha}
+      - --initial-cluster-state=new
+    ports:
+      - "2379:2379"
+      - "2380:2380"
+    volumes:
+      - etcd-data:/etcd-data
+    restart: unless-stopped
+
+  keeper:
+    image: docker.io/clickhouse/clickhouse-keeper:25.3.14.14@sha256:2c8b97bb628999adfa597172091ce495304e0a260d791fe6e475d64a314193b4
+    hostname: witness
+    extra_hosts:
+      - "server1:${HA_SERVER1_IP}"
+      - "server2:${HA_SERVER2_IP}"
+    volumes:
+      - ./out/keeper.xml:/etc/clickhouse-keeper/keeper_config.xml:ro
+      - keeper-data:/var/lib/clickhouse
+    ports:
+      - "9181:9181"
+      - "9234:9234"
+    restart: unless-stopped
+
+volumes:
+  etcd-data:
+  keeper-data:

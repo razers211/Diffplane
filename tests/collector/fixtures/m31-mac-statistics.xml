@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?><data xmlns="urn:ietf:params:xml:ns:netconf:base:1.0" xmlns:nc="urn:ietf:params:xml:ns:netconf:base:1.0">
+    <mac xmlns="urn:huawei:yang:huawei-mac">
+      <mac-statistics>
+        <mac-statistic>
+          <slot-id>1</slot-id>
+          <total>0</total>
+          <black-hole>0</black-hole>
+          <static>0</static>
+          <dynamic>0</dynamic>
+          <dynamic-local>0</dynamic-local>
+          <dynamic-remote>0</dynamic-remote>
+          <dynamic-trunk>0</dynamic-trunk>
+          <oam>0</oam>
+          <sticky>0</sticky>
+          <security>0</security>
+          <authen>0</authen>
+          <tunnel>0</tunnel>
+          <dynamic-blackhole>0</dynamic-blackhole>
+          <capacity>98304</capacity>
+        </mac-statistic>
+      </mac-statistics>
+    </mac>
+  </data>

@@ -1,0 +1,41 @@
+# A small fabric for tests: one spine and one M-LAG leaf pair, named like
+# seed/fabrics/example.yaml so tests can share names, with its own pools.
+# tests/orchestrator/data/import/leaf1.cfg is leaf1 of this fabric as a switch runs it.
+fabric:
+  name: example
+  asn: 65001
+  prefixes:
+    loopback: 10.10.0.0/24
+    vtep: 10.10.1.0/24
+    p2p: 10.11.0.0/24
+    mlag_bypass: 10.12.0.0/24
+    gateways: 10.100.0.0/16
+  mlag:
+    bypass_vlan: 4093
+  gateway_mac: 0000-5e00-0101
+
+services:
+  ntp_servers: [203.0.113.123, 203.0.113.124]
+  ntp_vpn_instance: _management_vpn_
+  snmp:
+    location: example-dc
+    contact: noc@example.com
+
+spines:
+  - name: spine1
+    model: CE6881H-48S6CQ
+
+leaf_pairs:
+  - leaves: [leaf1, leaf2]
+    model: CE6881H-48S6CQ
+    role: leaf
+    peer_link:
+      trunk: 0
+      members: [100GE1/0/5, 100GE1/0/6]
+    mlag_trunks:
+      - trunk: 1
+        members: [10GE1/0/1, 10GE1/0/2]
+
+links:
+  - {spine: spine1, spine_port: 100GE1/0/1, leaf: leaf1, leaf_port: 100GE1/0/1}
+  - {spine: spine1, spine_port: 100GE1/0/2, leaf: leaf2, leaf_port: 100GE1/0/1}

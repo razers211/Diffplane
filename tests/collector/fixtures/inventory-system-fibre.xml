@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?><data xmlns="urn:ietf:params:xml:ns:netconf:base:1.0" xmlns:nc="urn:ietf:params:xml:ns:netconf:base:1.0">
+    <system xmlns="urn:huawei:yang:huawei-system">
+      <system-info>
+        <platform-version>V100R025C00</platform-version>
+        <product-name>CE6881H</product-name>
+        <product-version>V300R025C00SPC500</product-version>
+        <hardware-model>CE6881H-48S6CQ</hardware-model>
+        <patch-version>V300R025SPH120</patch-version>
+        <esn>2102000000001</esn>
+        <software-name>CE6800-8800-9800_V300R025C00SPC500.cc</software-name>
+      </system-info>
+    </system>
+  </data>

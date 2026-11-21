@@ -1,0 +1,17 @@
+Huawei Versatile Routing Platform Software
+YunShan OS, Version 1.23.0.1 (CE6881H V300R023C00SPC500)
+Copyright (C) 2021-2023 Huawei Technologies Co., Ltd.
+HUAWEI CE6881H-48S6CQ uptime is 9 days, 3 hours, 7 minutes
+Patch Version: V300R023SPH120
+
+CE6881H-48S6CQ(Master) 1 : uptime is  9 days, 3 hours, 6 minutes
+        StartupTime 2026/10/01   21:04:36
+Memory      Size    : 4096 M bytes
+Flash       Size    : 4096 M bytes
+CE6881H-48S6CQ version information:
+1.PCB       Version : CEM48S6CQP08 VER D
+2.MAB       Version : 10
+3.Board     Type    : CE6881H-48S6CQ
+4.BIOS      Version : 1320
+5.CPLD1     Version : 257
+  CPLD2     Version : 257

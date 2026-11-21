@@ -1,0 +1,16 @@
+%inherit_from=annet.rulebook.texts.huawei
+# Our answers to VRP prompts. Each prompt here was seen on the lab switch (V300R023);
+# each has a test in tests/rulebook/.
+
+# seen during a lab wipe
+undo dfs-group *
+    dialog: Warning: The DFS-Group will be deleted. Continue? [Y/N]: ::: Y
+
+# seen removing a BGP-VPN instance (removal deploy);
+# no-commit CLI test: removing one peer of a BGP-VPN instance
+bgp *
+    undo vpn-instance *
+        dialog: Warning: The vpn session and address family will be deleted. Continue? [Y/N]: ::: Y
+    vpn-instance *
+        undo peer *
+            dialog: Warning: All the configurations related to the BGP peer will be deleted. Continue? [Y/N]: ::: Y

@@ -1,0 +1,23 @@
+<rpc-reply xmlns="urn:ietf:params:xml:ns:netconf:base:1.0" xmlns:nc="urn:ietf:params:xml:ns:netconf:base:1.0" message-id="urn:uuid:bb6cb4c8-02ed-4f08-b2eb-36bd1e3e5e26">
+  <cli-results xmlns="urn:huawei:yang:huawei-cli">
+    <cli-result>
+      <sequence>1</sequence>
+      <sub-sequence>1</sub-sequence>
+      <command>display bgp vpnv4 vpn-instance FW peer</command>
+      <execute-result>success</execute-result>
+      <cmd-output-info> Status codes: * - Dynamic
+ BGP local router ID : 10.10.0.2
+ Local AS number : 65001
+
+ VPN-Instance FW, Router ID 10.10.0.2:
+ Total number of peers      : 1
+ Peers in established state : 0
+ Total number of dynamic peers : 0
+
+  Peer                             V          AS  MsgRcvd  MsgSent  OutQ  Up/Down       State  PrefRcv
+  10.150.25.5                       4 64086.60007        0        0     0 17:53:16        Idle        0
+</cmd-output-info>
+      <output-status>end</output-status>
+    </cli-result>
+  </cli-results>
+</rpc-reply>

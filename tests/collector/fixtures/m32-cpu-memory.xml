@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?><data xmlns="urn:ietf:params:xml:ns:netconf:base:1.0" xmlns:nc="urn:ietf:params:xml:ns:netconf:base:1.0">
+    <cpu-memory xmlns="urn:huawei:yang:huawei-cpu-memory">
+      <board-cpu-infos>
+        <board-cpu-info>
+          <slot-id>1</slot-id>
+          <cpu-id>0</cpu-id>
+          <overload-threshold>90</overload-threshold>
+          <unoverload-threshold>75</unoverload-threshold>
+          <interval>1</interval>
+          <system-cpu-usage>20</system-cpu-usage>
+          <cpu-cores>4</cpu-cores>
+          <monitor-cycle>10000</monitor-cycle>
+          <current-overload-state>unoverload</current-overload-state>
+          <forward-is-deployed>false</forward-is-deployed>
+          <dataplane-cpu-usage>0</dataplane-cpu-usage>
+        </board-cpu-info>
+      </board-cpu-infos>
+      <board-memory-infos>
+        <board-memory-info>
+          <slot-id>1</slot-id>
+          <cpu-id>0</cpu-id>
+          <overload-threshold>92</overload-threshold>
+          <unoverload-threshold>75</unoverload-threshold>
+          <os-memory-total>3854776</os-memory-total>
+          <os-memory-use>1733480</os-memory-use>
+          <os-memory-free>2121296</os-memory-free>
+          <os-memory-usage>44</os-memory-usage>
+          <current-overload-state>unoverload</current-overload-state>
+          <hugepages-total>122880</hugepages-total>
+          <hugepages-free>0</hugepages-free>
+        </board-memory-info>
+      </board-memory-infos>
+    </cpu-memory>
+  </data>

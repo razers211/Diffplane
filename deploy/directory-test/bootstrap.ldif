@@ -1,0 +1,40 @@
+# Test directory (Compose profile directory-test). Throwaway test users only:
+# these passwords protect nothing real. Base dc=example,dc=net (LDAP_DOMAIN in compose.yaml).
+dn: ou=people,dc=example,dc=net
+objectClass: organizationalUnit
+ou: people
+
+dn: ou=groups,dc=example,dc=net
+objectClass: organizationalUnit
+ou: groups
+
+dn: uid=alice,ou=people,dc=example,dc=net
+objectClass: inetOrgPerson
+uid: alice
+cn: Alice Test
+sn: Test
+userPassword: alice-test-pw
+
+dn: uid=carol,ou=people,dc=example,dc=net
+objectClass: inetOrgPerson
+uid: carol
+cn: Carol Test
+sn: Test
+userPassword: carol-test-pw
+
+dn: uid=erin,ou=people,dc=example,dc=net
+objectClass: inetOrgPerson
+uid: erin
+cn: Erin Test
+sn: Test
+userPassword: erin-test-pw
+
+dn: cn=netops,ou=groups,dc=example,dc=net
+objectClass: groupOfNames
+cn: netops
+member: uid=alice,ou=people,dc=example,dc=net
+
+dn: cn=noc,ou=groups,dc=example,dc=net
+objectClass: groupOfNames
+cn: noc
+member: uid=carol,ou=people,dc=example,dc=net

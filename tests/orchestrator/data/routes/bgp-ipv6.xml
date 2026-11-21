@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rpc-reply xmlns="urn:ietf:params:xml:ns:netconf:base:1.0" xmlns:nc="urn:ietf:params:xml:ns:netconf:base:1.0" message-id="urn:uuid:67617990-ba8f-47c5-ac0a-6103004567b7">
+  <cli-results xmlns="urn:huawei:yang:huawei-cli">
+    <cli-result>
+      <sequence>1</sequence>
+      <sub-sequence>1</sub-sequence>
+      <command>display bgp ipv6 peer</command>
+      <execute-result>success</execute-result>
+      <cmd-output-info> Status codes: * - Dynamic
+ BGP local router ID        : 10.10.0.2
+ Local AS number            : 65001
+ Total number of peers      : 1
+ Peers in established state : 0
+ Total number of dynamic peers : 0
+
+  Peer                             V          AS  MsgRcvd  MsgSent  OutQ  Up/Down       State  PrefRcv
+  FD00:99::2                       4       65300        0        0     0 00:05:28        Idle        0
+</cmd-output-info>
+      <output-status>end</output-status>
+    </cli-result>
+    <cli-result>
+      <sequence>2</sequence>
+      <sub-sequence>1</sub-sequence>
+      <command>display bgp ipv6 routing-table</command>
+      <execute-result>success</execute-result>
+      <cmd-output-info>
+</cmd-output-info>
+      <output-status>end</output-status>
+    </cli-result>
+    <cli-result>
+      <sequence>3</sequence>
+      <sub-sequence>1</sub-sequence>
+      <command>display bgp ipv6 routing-table peer FD00:99::2 advertised-routes</command>
+      <execute-result>success</execute-result>
+      <cmd-output-info>
+</cmd-output-info>
+      <output-status>end</output-status>
+    </cli-result>
+    <cli-result>
+      <sequence>4</sequence>
+      <sub-sequence>1</sub-sequence>
+      <command>display bgp vpnv6 vpn-instance FW peer</command>
+      <execute-result>success</execute-result>
+      <cmd-output-info> Status codes: * - Dynamic
+ BGP local router ID        : 10.10.0.2
+ Local AS number            : 65001
+ Total number of peers      : 1
+ Peers in established state : 0
+ Total number of dynamic peers : 0
+
+  VPN-Instance FW, Router ID 10.10.0.2:
+  Peer                             V          AS  MsgRcvd  MsgSent  OutQ  Up/Down       State  PrefRcv
+  FD00:255::4                      4        1.64        0        0     0 00:05:29        Idle        0
+</cmd-output-info>
+      <output-status>end</output-status>
+    </cli-result>
+    <cli-result>
+      <sequence>5</sequence>
+      <sub-sequence>1</sub-sequence>
+      <command>display bgp vpnv6 vpn-instance FW routing-table</command>
+      <execute-result>success</execute-result>
+      <cmd-output-info> BGP Local router ID is 10.10.0.2
+ Status codes: * - valid, &gt; - best, d - damped, a - add path,
+               h - history,  i - internal, s - suppressed, S - Stale
+ Origin      : i - IGP, e - EGP, ? - incomplete
+
+
+ VPN-Instance FW, Router ID 10.10.0.2:
+
+ Total Number of Routes: 1
+ *&gt;     Network  : FD12:3456:789A:6::                       PrefixLen : 64  
+        NextHop  : ::                                       LocPrf    :   
+        MED      : 0                                        PrefVal   : 0
+        Label    : 
+        Path/Ogn :  ?
+</cmd-output-info>
+      <output-status>end</output-status>
+    </cli-result>
+    <cli-result>
+      <sequence>6</sequence>
+      <sub-sequence>1</sub-sequence>
+      <command>display bgp vpnv6 vpn-instance FW routing-table peer FD00:255::2 advertised-routes</command>
+      <execute-result>success</execute-result>
+      <cmd-output-info>Info: The peer does not exist.</cmd-output-info>
+      <output-status>end</output-status>
+    </cli-result>
+  </cli-results>
+</rpc-reply>

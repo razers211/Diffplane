@@ -1,0 +1,54 @@
+# Example fabric in the PIP layout (as imported): each M-LAG switch's own PIP on
+# LoopBack1 from the `pip` pool (not in OSPF) and the pair's shared VTEP on LoopBack2, so
+# `pip-source <own LoopBack1> peer <peer's LoopBack1> bypass`. Centralized, the spines are the
+# gateway pair. Device names carry a "p-" prefix. Models and ports are placeholders.
+fabric:
+  name: example-pip
+  asn: 65004
+  architecture: centralized
+  gateway_pair: [p-spine1, p-spine2]
+  prefixes:
+    loopback: 10.40.0.0/24
+    pip: 10.40.1.0/24
+    vtep: 10.40.2.0/24
+    p2p: 10.41.0.0/24
+    mlag_bypass: 10.42.0.0/24
+    gateways: 10.140.0.0/16
+  mlag:
+    bypass_vlan: 4090
+  gateway_mac: 0000-5e00-0104
+
+services:
+  ntp_servers: [192.0.2.1, 192.0.2.2]   # placeholders (TEST-NET-1)
+  snmp:
+    location: example-pip-dc
+    contact: noc@example.com
+
+spines:
+  - name: p-spine1
+    model: CE6881H-48T6CQ
+  - name: p-spine2
+    model: CE6881H-48T6CQ
+
+spine_pair:
+  spines: [p-spine1, p-spine2]
+  peer_link:
+    trunk: 0
+    members: [10GE1/0/47, 10GE1/0/48]
+
+leaf_pairs:
+  - leaves: [p-leaf1, p-leaf2]
+    model: CE6881H-48T6CQ
+    role: leaf
+    peer_link:
+      trunk: 0
+      members: [10GE1/0/47, 10GE1/0/48]
+    mlag_trunks:
+      - trunk: 1
+        members: [10GE1/0/1]
+
+links:
+  - {spine: p-spine1, spine_port: 100GE1/0/1, leaf: p-leaf1, leaf_port: 100GE1/0/1}
+  - {spine: p-spine1, spine_port: 100GE1/0/2, leaf: p-leaf2, leaf_port: 100GE1/0/1}
+  - {spine: p-spine2, spine_port: 100GE1/0/1, leaf: p-leaf1, leaf_port: 100GE1/0/2}
+  - {spine: p-spine2, spine_port: 100GE1/0/2, leaf: p-leaf2, leaf_port: 100GE1/0/2}

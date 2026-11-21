@@ -1,0 +1,202 @@
+# HA server (design): used on server1 and server2 on top of
+# compose.yaml, always through deploy/ha/fabric-ha (it renders ha/out/ and passes both env files).
+#
+# Always running on both servers: Patroni (Postgres), etcd, keepalived (the VIP), ClickHouse with
+# embedded Keeper, Prometheus, Alertmanager (two-member cluster), backups and the agent.
+# Profile "active": NetBox, its worker, Redis, the orchestrator, the collector, flows and ZTP. The agent
+# (ha/agent.sh) starts them where the local Patroni is the leader and stops them elsewhere, so the
+# database, the jobs and the VIP always move together.
+services:
+  # The single-server compose's two Postgres containers are replaced by one Patroni cluster holding both databases.
+  netbox-postgres:
+    profiles: [single]
+  postgres:
+    profiles: [single]
+
+  patroni:
+    build:
+      context: ./ha/patroni
+    image: diffplane-patroni:local
+    hostname: ${HA_NODE:?render with deploy/ha/fabric-ha}
+    environment:
+      NETBOX_DB_PASSWORD: ${NETBOX_DB_PASSWORD:?run gen_env.py to create deploy/.env}
+      PLATFORM_DB_PASSWORD: ${PLATFORM_DB_PASSWORD:?run gen_env.py to create deploy/.env}
+    volumes:
+      - ./ha/out/patroni.yml:/etc/patroni.yml:ro
+      - ./ha/patroni/post_bootstrap.sh:/post_bootstrap.sh:ro
+      - patroni-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"   # replication between the servers, and local clients
+      - "8008:8008"   # Patroni's REST API: the peer, keepalived's check and the agent
+    depends_on:
+      etcd:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-T", "2", "-O", "/dev/null", "http://127.0.0.1:8008/health"]
+      start_period: 60s
+      interval: 10s
+      timeout: 3s
+    restart: unless-stopped
+
+  etcd:
+    image: quay.io/coreos/etcd:v3.5.17@sha256:a055da833a7c013b836ed0822e8ec1f99b059658be255ad8d0fcd31b635ae3d6
+    command:
+      - etcd
+      - --name=${HA_NODE}
+      - --data-dir=/etcd-data
+      - --listen-client-urls=http://0.0.0.0:2379
+      - --advertise-client-urls=http://${HA_NODE_IP}:2379
+      - --listen-peer-urls=http://0.0.0.0:2380
+      - --initial-advertise-peer-urls=http://${HA_NODE_IP}:2380
+      - --initial-cluster=${HA_ETCD_CLUSTER}
+      - --initial-cluster-token=${ETCD_TOKEN:?run gen_env.py --ha}
+      - --initial-cluster-state=new
+    ports:
+      - "2379:2379"
+      - "2380:2380"
+    volumes:
+      - etcd-data:/etcd-data
+    restart: unless-stopped
+
+  keepalived:
+    build:
+      context: ./ha/keepalived
+    image: diffplane-keepalived:local
+    network_mode: host
+    cap_add: [NET_ADMIN, NET_BROADCAST, NET_RAW]
+    tmpfs: [/run]   # a pid file kept in the container from the last boot can make it exit as "already running"
+    volumes:
+      - ./ha/out/keepalived.conf:/etc/keepalived/keepalived.conf:ro
+    restart: unless-stopped
+
+  ha-agent:
+    image: docker.io/library/docker:27.5.1-cli@sha256:851f91d241214e7c6db86513b270d58776379aacc5eb9c4a87e5b47115e3065c
+    network_mode: host   # Patroni's REST API on 127.0.0.1:8008
+    working_dir: ${HA_REPO}/deploy
+    entrypoint: ["sh", "ha/agent.sh"]
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ${HA_REPO}:${HA_REPO}   # same path as on the host: compose resolves relative paths from it
+    restart: unless-stopped
+
+  # -- active only ------------------------------------------------------------------------------
+  redis:
+    profiles: [active]
+  netbox:
+    profiles: [active]
+    environment:
+      DB_HOST: patroni
+    depends_on: !override
+      redis:
+        condition: service_healthy
+  netbox-worker:
+    profiles: [active]
+    environment:
+      DB_HOST: patroni
+  orchestrator:
+    profiles: [active]
+    environment:
+      DATABASE_URL: postgresql+asyncpg://platform:${PLATFORM_DB_PASSWORD}@patroni:5432/platform
+    volumes:
+      # Made once for the VIP's names on the first server, copied to the second (docs/operations.md, HA).
+      - ./ha/tls:/tls
+      - ./ha/tls-public:/tls-public
+    depends_on: !override
+      netbox:
+        condition: service_healthy
+  collector:
+    profiles: [active]
+    ports:
+      - "9108:9108"   # both servers' Prometheus scrape it through the VIP
+  flows:
+    profiles: [active]
+    environment:
+      CLICKHOUSE_CLUSTER: fabric   # tables created on both replicas (flows/store.py)
+    # the switches export to the southbound VIP; only the active server runs flows and holds it,
+    # so the port listens on every address (binding to the VIP would race keepalived at a failover).
+    ports: !override
+      - "${FLOWS_PORT:-2055}:2055/udp"
+  syslog:
+    profiles: [active]
+    environment:
+      CLICKHOUSE_CLUSTER: fabric   # its table replicated like the flows tables
+    ports: !override   # to the southbound VIP, held with the service by the active server
+      - "${SYSLOG_PORT:-514}:5514/udp"
+  sftpd:
+    profiles: [active]
+    volumes:
+      - ./ha/tls:/tls:ro   # the host key travels with the certificate: the same on both servers
+    ports: !override   # the switches pull images from the southbound VIP
+      - "${SFTP_PORT:-2222}:2222"
+  ztp:
+    # DHCP and TFTP only where the VIPs are. It idles until ZTP is configured.
+    profiles: [active]
+
+  # -- on both servers ---------------------------------------------------------------------------
+  backup:
+    restart: unless-stopped   # back after a reboot (the agent starts only the active ones)
+    environment:
+      # The standby dumps its replica, the active its primary: both keep the last 14 days.
+      NETBOX_DB_HOST: patroni
+      PLATFORM_DB_HOST: patroni
+    depends_on: !override
+      patroni:
+        condition: service_healthy
+
+  clickhouse:
+    hostname: ${HA_NODE}
+    extra_hosts:
+      - "server1:${HA_SERVER1_IP}"
+      - "server2:${HA_SERVER2_IP}"
+      - "witness:${HA_WITNESS_IP}"
+    volumes:
+      - ./ha/out/clickhouse-ha.xml:/etc/clickhouse-server/config.d/ha.xml:ro
+    ports:
+      - "9000:9000"   # distributed DDL and queries between the replicas
+      - "9009:9009"   # replication (interserver)
+      - "9181:9181"   # Keeper clients
+      - "9234:9234"   # Keeper raft
+
+  prometheus:
+    restart: unless-stopped   # back after a reboot (the agent starts only the active ones)
+    volumes:
+      - ./ha/out/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./ha/tls-public:/tls-public:ro
+
+  alertmanager-init:
+    # The volume is first mounted here on a server whose orchestrator never ran, so it is root's;
+    # Alertmanager and the orchestrator run as nobody. Before this server was ever active, the
+    # orchestrator has written no configuration: start with a receiver that sends nothing; the active
+    # orchestrator writes its own and reloads.
+    image: docker.io/library/alpine:3.20@sha256:d9e853e87e55526f6b2917df91a2115c36dd7c696a35be12163d44e6e2a4b6bc
+    command:
+      - sh
+      - -c
+      - |
+        test -f /config/alertmanager.yml || printf 'route:\n  receiver: none\nreceivers:\n  - name: none\n' > /config/alertmanager.yml
+        chown -R 65534 /config
+    volumes:
+      - alertmanager-config:/config
+    restart: "no"
+
+  alertmanager:
+    restart: unless-stopped   # back after a reboot (the agent starts only the active ones)
+    entrypoint:
+      - /bin/alertmanager
+      - --config.file=/config/alertmanager.yml
+      - --storage.path=/alertmanager
+      - --cluster.listen-address=0.0.0.0:9094
+      - --cluster.advertise-address=${HA_NODE_IP}:9094
+      - --cluster.peer=${HA_PEER_IP}:9094
+    command: !reset []   # compose.yaml's volumes stay: the configuration read-only
+    ports:
+      - "9093:9093"
+      - "9094:9094/tcp"
+      - "9094:9094/udp"
+    depends_on: !override
+      alertmanager-init:
+        condition: service_completed_successfully
+
+volumes:
+  patroni-data:
+  etcd-data:

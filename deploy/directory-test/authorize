@@ -1,0 +1,9 @@
+# Test RADIUS users: throwaway passwords. Filter-Id carries the role and
+# fabrics the platform reads (role:fabric,fabric; a + after a fabric: may approve).
+bob	Cleartext-Password := "bob-test-pw"
+	Filter-Id = "operator:example+"
+
+dave	Cleartext-Password := "dave-test-pw"
+	Filter-Id = "viewer"
+
+frank	Cleartext-Password := "frank-test-pw"

@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rpc-reply xmlns="urn:ietf:params:xml:ns:netconf:base:1.0" xmlns:nc="urn:ietf:params:xml:ns:netconf:base:1.0" message-id="urn:uuid:e745a371-c001-4c81-b2de-aa987529d5a1">
+  <cli-results xmlns="urn:huawei:yang:huawei-cli">
+    <cli-result>
+      <sequence>1</sequence>
+      <sub-sequence>1</sub-sequence>
+      <command>display device temperature</command>
+      <execute-result>success</execute-result>
+      <cmd-output-info>  Base-Board, Unit: celsius, Slot 1, Fru 0
+-------------------------------------------------------------------------------------------------------------
+BoardType                 SensorID  SensorName       Status      Minor  Major  Fatal  FanTMin  FanTMax  Temp
+-------------------------------------------------------------------------------------------------------------
+CE6881H-48S6CQ-B                 1  TEMP_A           Normal         70     75     85       57       60    28
+CE6881H-48S6CQ-B                 2  TEMP_B           Normal         70     75     85       62       65    37
+CE6881H-48S6CQ-B                 3  CPU              Normal        103    108    115       67       70    31
+CE6881H-48S6CQ-B                 4  NP0              Normal        103    108    115       92       95    41
+CE6881H-48S6CQ-B                 5  NP1              Normal        103    108    115       92       95    46
+-------------------------------------------------------------------------------------------------------------
+  Base-Board, Unit: celsius, Slot PWR1
+-------------------------------------------------------------------------------------------------------------
+BoardType                 SensorID  SensorName       Status      Minor  Major  Fatal  FanTMin  FanTMax  Temp
+-------------------------------------------------------------------------------------------------------------
+PAC600S12-EB                     1  --               --             --     --     --       --       --    31
+-------------------------------------------------------------------------------------------------------------
+  Base-Board, Unit: celsius, Slot PWR2
+-------------------------------------------------------------------------------------------------------------
+BoardType                 SensorID  SensorName       Status      Minor  Major  Fatal  FanTMin  FanTMax  Temp
+-------------------------------------------------------------------------------------------------------------
+PAC600S12-EB                     1  --               --             --     --     --       --       --    50
+-------------------------------------------------------------------------------------------------------------
+</cmd-output-info>
+      <output-status>end</output-status>
+    </cli-result>
+  </cli-results>
+</rpc-reply>

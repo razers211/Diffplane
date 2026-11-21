@@ -1,0 +1,211 @@
+# Alert rules. Prometheus sends firing alerts to Alertmanager,
+# which has no receiver yet: list them with amtool (docs/operations.md, Alerts).
+groups:
+  - name: fabric
+    rules:
+      - alert: FabricDeviceOutOfSync
+        # Latest annet diff not empty: a manual change on the switch, or intent not deployed.
+        expr: fabric_drift_device_state{state="out_of_sync"} == 1
+        for: 5m   # (was 30m): drift is checked every 15 minutes anyway
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.device }} ({{ $labels.site }}) is out of sync"
+          description: "Its latest annet diff is not empty. Read it on the Drift tab."
+
+      - alert: FabricDriftCheckStopped
+        # No drift run started for 3 intervals, or the orchestrator exports no run at all
+        # (down, or every run skipped since it started).
+        expr: >-
+          (time() - fabric_drift_last_run_timestamp_seconds > 3 * fabric_drift_interval_seconds)
+          or absent(fabric_drift_last_run_timestamp_seconds)
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "The scheduled drift check has stopped"
+          description: "No drift run for over 3 intervals. Check the Drift tab (last skip reason) and the orchestrator logs."
+
+      - alert: FabricCollectorDeviceDown
+        # Every NETCONF poll of the device failed for 5 minutes (one success resets it).
+        expr: fabric_collector_device_up == 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "The collector cannot poll {{ $labels.device }}"
+          description: "NETCONF polls have failed for 5 minutes. Check `docker compose logs collector`."
+
+  # Hardware: the switch's and the module's own thresholds, read every 50 s.
+  # Optic levels only on ports in use (fabric_port_in_use, exported by the orchestrator): modules in
+  # unused ports never alarm. Tests: alerts.test.yml (promtool test rules).
+  - name: hardware
+    rules:
+      - alert: FabricPowerModuleFailed
+        # pm-status not normal: a failed module, or one without input (a test switch's PWR:1/1 on purpose).
+        expr: fabric_power_module_up == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.device }}: power module {{ $labels.module }} is not normal"
+          description: "No input or a failed module: the switch runs on its other supply. See its Hardware tab."
+
+      - alert: FabricFanMissing
+        expr: fabric_fan_present == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.device }}: fan {{ $labels.fan }} is missing"
+          description: "The switch reports the fan as not present. See its Hardware tab."
+
+      - alert: FabricTemperatureHigh
+        # At or over the sensor's own Minor threshold, or a sensor the switch reports not Normal.
+        expr: >-
+          (fabric_temperature_celsius >= on(device, slot, sensor) group_left fabric_temperature_threshold_celsius{level="minor"})
+          or fabric_temperature_sensor_normal == 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.device }}: temperature sensor {{ $labels.sensor }} (slot {{ $labels.slot }}) is hot"
+          description: "At or over the switch's own Minor threshold. See its Hardware tab."
+
+      - alert: FabricOpticRxPower
+        # Received light past the module's alarm thresholds, per channel, on a port in use.
+        expr: >-
+          (
+            fabric_optic_rx_power_dbm < on(device, interface) group_left fabric_optic_threshold{measure="rx_power", level="low_alarm"}
+            or fabric_optic_rx_power_dbm > on(device, interface) group_left fabric_optic_threshold{measure="rx_power", level="high_alarm"}
+          ) and on(device, interface) fabric_port_in_use == 1
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.device }} {{ $labels.interface }}: received light {{ $value }} dBm past the module's alarm threshold"
+          description: "No light (fibre, far end down) or too much. See the switch's Ports tab."
+
+      - alert: FabricOpticTxPower
+        expr: >-
+          (
+            fabric_optic_tx_power_dbm < on(device, interface) group_left fabric_optic_threshold{measure="tx_power", level="low_alarm"}
+            or fabric_optic_tx_power_dbm > on(device, interface) group_left fabric_optic_threshold{measure="tx_power", level="high_alarm"}
+          ) and on(device, interface) fabric_port_in_use == 1
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.device }} {{ $labels.interface }}: transmitted light {{ $value }} dBm past the module's alarm threshold"
+          description: "The module's laser is failing. See the switch's Ports tab."
+
+      - alert: FabricOpticTemperature
+        expr: >-
+          fabric_optic_temperature_celsius > on(device, interface) group_left fabric_optic_threshold{measure="temperature", level="high_alarm"}
+          and on(device, interface) fabric_port_in_use == 1
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.device }} {{ $labels.interface }}: optical module at {{ $value }} °C, past its alarm threshold"
+          description: "See the switch's Ports tab."
+
+  # Control plane and errors. A partner that is planned (not built yet) never
+  # alarms: the orchestrator exports fabric_planned_address{peer} and fabric_mlag_peer_planned{device}.
+  - name: control-plane
+    rules:
+      - alert: FabricBgpPeerDown
+        expr: fabric_bgp_peer_up == 0 unless on(peer) fabric_planned_address == 1
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.device }}: BGP peer {{ $labels.peer }} ({{ $labels.family }}, {{ $labels.vpn }}) is down"
+          description: "Not established for 2 minutes. See the switch's Control plane tab."
+
+      - alert: FabricOspfNeighbourDown
+        expr: >-
+          fabric_ospf_neighbor_up == 0
+          unless on(neighbor) label_replace(fabric_planned_address == 1, "neighbor", "$1", "peer", "(.*)")
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.device }}: OSPF neighbour {{ $labels.neighbor }} on {{ $labels.interface }} is not Full"
+          description: "For 2 minutes. See the switch's Control plane tab."
+
+      - alert: FabricMlagHeartbeatLost
+        expr: fabric_mlag_heartbeat_up == 0 unless on(device) fabric_mlag_peer_planned == 1
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.device }}: M-LAG heartbeat with its peer is lost"
+          description: "For 2 minutes. See the switch's Control plane tab."
+
+      - alert: FabricMlagPeerLinkDown
+        expr: fabric_mlag_peer_link_up == 0 unless on(device) fabric_mlag_peer_planned == 1
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.device }}: M-LAG peer-link {{ $labels.interface }} is down"
+          description: "For 2 minutes. See the switch's Control plane tab."
+
+      - alert: FabricInterfaceErrors
+        # New input or output errors in each of the last 10 minutes' 5-minute windows, on a port in use.
+        expr: >-
+          (increase(fabric_interface_in_errors_total[5m]) + increase(fabric_interface_out_errors_total[5m])) > 0
+          and on(device, interface) fabric_port_in_use == 1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.device }} {{ $labels.interface }}: errors rising"
+          description: "Input or output errors keep growing (a dirty fibre, a bad cable or optic). See the switch's Ports tab."
+
+      # storm control, loop detection or BPDU protection acting on a
+      # port, from the collector's 25 s control poll. No `for`: a shut port reopens after 45 s.
+      - alert: FabricPortProtectionTripped
+        expr: fabric_port_protection_tripped == 1
+        labels:
+          severity: warning
+        annotations:
+          summary: >-
+            {{ $labels.device }} {{ $labels.interface }}:
+            {{ if eq $labels.cause "storm-control" }}a {{ $labels.detail }} storm{{ else if eq $labels.cause "loopback-detect" }}a loop{{ else }}a BPDU (a switch plugged in){{ end }},
+            {{ if eq $labels.state "error-down" }}port shut{{ else if eq $labels.state "alarm" }}logged only (Watch){{ else }}excess dropped{{ end }}
+          description: "Edge-port protection acted on a server port. See Network › Port protection."
+
+  # from the orchestrator's anomaly reader (orchestrator/anomaly.py), every 5 minutes.
+  - name: anomalies
+    rules:
+      - alert: FabricTrafficAnomaly
+        # Far from the same hour's median over 14 days: 4 spreads, 1 % of the speed and 10 Mbit/s.
+        expr: fabric_traffic_anomaly
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: >-
+            {{ $labels.device }} {{ $labels.interface }}: traffic {{ $labels.direction }}
+            {{ if eq $labels.kind "high" }}far above{{ else }}far below{{ end }} usual ({{ $value | humanize }}bit/s)
+          description: "Its last 15 minutes against the same hour over the last 14 days. See Overview › Capacity."
+
+      - alert: FabricIntentStoreDiffers
+        # NetBox's published copy of an intent document (a config context) differs from the platform database.
+        expr: fabric_intent_store_differences > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $value }} intent documents are not published to NetBox as the platform database has them"
+          description: "Generators read NetBox's copy. In the orchestrator container: python -m orchestrator.intent_store check lists them, republish repairs."
+
+      - alert: FabricLinkFlapping
+        expr: fabric_link_flapping >= 3
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.device }} {{ $labels.interface }} is flapping ({{ $value }} downs in 30 minutes)"
+          description: "A cable, optic or the far end keeps going down. See the switch's History tab."

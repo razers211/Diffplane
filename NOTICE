@@ -1,0 +1,12 @@
+Diffplane
+Copyright 2026 The Diffplane authors
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+It builds and runs third-party software under its own licenses; see THIRD_PARTY_LICENSES.md.
+The orchestrator image contains a patched build of gnetcli (MIT, Copyright (c) 2023 YANDEX LLC):
+the patch is deploy/gnetcli/known-hosts.patch.
+
+Huawei, CloudEngine and VRP are trademarks of Huawei Technologies Co., Ltd. They are used only to
+say which switches Diffplane is compatible with. Diffplane is not affiliated with or endorsed by
+Huawei.

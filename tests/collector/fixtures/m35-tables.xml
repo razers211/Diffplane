@@ -1,0 +1,27 @@
+<data xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">
+  <!-- ARP entries as a test switch answered a probe; the MAC entry is shaped from
+       huawei-mac.yang (bd-dynamic-mac), since the example's MAC table was empty: unverified. -->
+  <arp xmlns="urn:huawei:yang:huawei-arp">
+    <query-entries>
+      <query-entry>
+        <ni-name>_management_vpn_</ni-name><ip-addr>172.24.0.11</ip-addr><mac-addr>0200-0000-00e0</mac-addr>
+        <style-type>interface-arp</style-type><if-name>MEth0/0/0</if-name>
+      </query-entry>
+      <query-entry>
+        <ni-name>_management_vpn_</ni-name><ip-addr>172.24.0.254</ip-addr><mac-addr>0200-0000-00f2</mac-addr>
+        <style-type>dynamic-arp</style-type><if-name>MEth0/0/0</if-name>
+      </query-entry>
+      <query-entry>
+        <ni-name>_public_</ni-name><ip-addr>10.11.0.2</ip-addr><mac-addr>0200-0000-00e2</mac-addr>
+        <style-type>interface-arp</style-type><if-name>100GE1/0/1</if-name>
+      </query-entry>
+    </query-entries>
+  </arp>
+  <mac xmlns="urn:huawei:yang:huawei-mac">
+    <bd-dynamic-macs>
+      <bd-dynamic-mac>
+        <address>aaaa-0000-0010</address><bd-id>500</bd-id><type>dynamic</type><out-interface-name>10GE1/0/3.1</out-interface-name>
+      </bd-dynamic-mac>
+    </bd-dynamic-macs>
+  </mac>
+</data>

@@ -1,0 +1,48 @@
+# Annet context for the orchestrator container (ANN_CONTEXT_CONFIG_PATH points here).
+# No secrets in this file:
+#   NetBox URL and token  -> NETBOX_URL, NETBOX_TOKEN
+#   device SSH login      -> GNETCLI_DEV_LOGIN, GNETCLI_DEV_PASSWORD
+# gnetcli connects to each device's NetBox primary IP.
+fetcher:
+  default:
+    adapter: gnetcli
+    params:
+      # Each Annet process starts its own gnetcli_server: a free port (0) instead of the fixed
+      # 127.0.0.1:50051, so runs may overlap (orchestrator/annet.py PARALLEL); the rest is
+      # gnetcli_adapter's default. Only a context param reaches it: the adapters pass their own
+      # default to AppSettings, which overrides GNETCLI_SERVER_CONF (seen on an imported fabric).
+      server_conf: &server_conf
+        port: 127.0.0.1:0
+        logging: {level: debug, json: true}
+        dev_auth: {use_agent: true, ssh_config: true}
+
+deployer:
+  default:
+    adapter: gnetcli
+    params:
+      server_conf: *server_conf
+      # One transcript per deploy (commands and device replies). The orchestrator shows
+      # its end when a deploy fails (orchestrator/annet.py DEPLOY_LOGS). Holds secrets.
+      logs_dir: /tmp/annet-deploy-logs
+
+generators:
+  default:
+    - generators          # this repository's generators/ package (run from the repo root)
+
+storage:
+  default:
+    adapter: netbox
+
+rulebook:
+  default:
+    module: rulebook.texts   # this repository's rulebook/, inheriting Annet's Huawei rules
+
+context:
+  default:
+    fetcher: default
+    deployer: default
+    generators: default
+    storage: default
+    rulebook: default
+
+selected_context: default

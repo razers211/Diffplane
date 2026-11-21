@@ -1,0 +1,20 @@
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: /
+    schedule: {interval: weekly}
+    open-pull-requests-limit: 5
+  - package-ecosystem: npm
+    directory: /gui
+    schedule: {interval: weekly}
+    open-pull-requests-limit: 5
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: {interval: weekly}
+  # Docker image tags and digests: Dockerfiles and Compose files.
+  - package-ecosystem: docker
+    directories: [/orchestrator, /deploy/ztp, /deploy/ha/patroni, /deploy/ha/keepalived]
+    schedule: {interval: weekly}
+  - package-ecosystem: docker-compose
+    directories: [/deploy, /deploy/ha]
+    schedule: {interval: weekly}

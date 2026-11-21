@@ -1,0 +1,13 @@
+<rpc-reply xmlns="urn:ietf:params:xml:ns:netconf:base:1.0" xmlns:nc="urn:ietf:params:xml:ns:netconf:base:1.0" message-id="urn:uuid:0007465b-7220-40b5-90c8-e74acbff2973">
+  <cli-results xmlns="urn:huawei:yang:huawei-cli">
+    <cli-result>
+      <sequence>1</sequence>
+      <sub-sequence>1</sub-sequence>
+      <command>display bgp vpnv4 vpn-instance FW routing-table</command>
+      <execute-result>success</execute-result>
+      <cmd-output-info>
+</cmd-output-info>
+      <output-status>end</output-status>
+    </cli-result>
+  </cli-results>
+</rpc-reply>

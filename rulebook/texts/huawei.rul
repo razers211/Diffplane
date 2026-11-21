@@ -1,0 +1,89 @@
+%inherit_from=annet.rulebook.texts.huawei
+# Our changes to Annet's Huawei patching rules. Each rule here has a test in tests/rulebook/.
+
+# VRP stores SNMP communities encrypted ("cipher ..."), so they never match the plain
+# text the Snmp generator emits. Both forms are compared by their alias instead.
+snmp-agent community * cipher *     %diff_logic=rulebook.huawei.snmp.community_diff
+snmp-agent community read ~         %diff_logic=rulebook.huawei.snmp.community_diff
+# SNMPv3: a user keyed by name (its removal takes all its lines), a trap target by name, a
+# group by name and level, each undone in the short form a test switch took.
+snmp-agent usm-user v3 *            %logic=rulebook.huawei.snmp.usm_user
+snmp-agent target-host host-name *  %logic=rulebook.huawei.snmp.target_host
+snmp-agent group v3 * *             %logic=rulebook.huawei.snmp.group
+# Annet's version rule with its versions in a fixed order (it joins a set: the patch changed between runs).
+snmp-agent sys-info version         %logic=rulebook.huawei.snmp.version
+
+# NVE interfaces can be deleted (Annet's rule only allows removing their contents).
+interface *                         %logic=rulebook.huawei.iface.permanent
+    # DHCP relay: V300 undoes the relay source interface without its name.
+    dhcp relay giaddr source-interface *  %logic=rulebook.huawei.dhcp.giaddr
+    dhcpv6 relay source-interface *       %logic=rulebook.huawei.dhcp.source_interface6
+    # An L2 sub-interface moving to another bridge domain (a segment replaced on its port):
+    # `undo bridge-domain` takes no number.
+    bridge-domain *                       %logic=rulebook.huawei.iface.bridge_domain
+    # QoS: `trust dscp` is undone as `undo trust`. A weight is keyed by its
+    # queue (Annet's `qos queue * drr weight`): retyped in place, undone without its value.
+    trust dscp                            %logic=rulebook.huawei.qos.trust
+    # OSPF authentication: the undo takes nothing after the mode.
+    ospf authentication-mode keychain *   %logic=rulebook.huawei.ospf_auth.interface
+    # Copper port speed: `undo speed` takes nothing after it (seen on V300R025).
+    speed *                               %logic=rulebook.huawei.iface.speed
+
+# The OSPF keychain: removed by name alone; a key is stored encrypted, so only its presence
+# is compared (a key never changes under its ID: a roll adds a new ID).
+aaa
+    local-user *    %diff_logic=rulebook.huawei.ospf_auth.local_user_presence %logic=annet.rulebook.huawei.aaa.user
+
+radius-server template *
+    radius-server shared-key cipher *   %diff_logic=rulebook.huawei.ospf_auth.radius_key_presence
+
+keychain * mode *                   %logic=rulebook.huawei.ospf_auth.keychain
+    key-id *
+        key-string cipher *         %diff_logic=rulebook.huawei.ospf_auth.key_presence
+        ~
+    ~
+
+# VRP stores the DFS group key encrypted; only its presence is compared.
+dfs-group *
+    authentication-mode hmac-sha256 password *  %diff_logic=rulebook.huawei.mlag.password_presence
+    ~
+
+# Peers of a BGP-VPN instance: Annet's peer logic (an AS change or removal is `undo peer <ip>`,
+# then the peer is declared again with all its lines), which Annet's own rulebook applies only
+# at the top of bgp and in address families. V300 refuses `undo peer <ip> as-number <asn>` and
+# an AS change in place. Our diff logic also re-sends the peer's
+# lines in the instance's `ipv4-family vpn-instance` block, which the wipe removes too.
+# Segment VPN instances removed in the same patch take their BGP-VPN blocks with them:
+# rulebook.huawei.vpn.bgp leaves those removals out, around Annet's own `bgp` logic.
+bgp %logic=rulebook.huawei.vpn.bgp %diff_logic=rulebook.huawei.bgp.reapply_after_as_number_change
+    vpn-instance *
+        peer * description
+        peer * bfd enable
+        peer * bfd %logic=annet.rulebook.huawei.bgp.bfd
+        # Last, so that it does not match the peer options above (as in Annet's rulebook).
+        peer *  %logic=annet.rulebook.huawei.bgp.peer
+
+# Microsegmentation (V300R025). An EPG is keyed by its ID, so a new name or inside behaviour
+# retypes its line in place and its removal is `undo traffic-segment segment-id <id>`; `segment-policy statistics enable` before `segment-policy *`, which would key it as
+# "statistics". A classifier's rule is keyed by its number: retyped to change, undone in full.
+traffic-segment segment-id *
+traffic-segment default-policy *   %diff_logic=rulebook.huawei.microseg.default_deny
+segment-policy statistics enable
+segment-policy *
+segment classifier *
+    rule * %logic=rulebook.huawei.microseg.rule
+segment behavior *
+segment policy *
+    classifier * behavior *
+
+# Syslog: the platform's loghost is keyed by its address, retyped in place to change its level
+# or port, undone up to its VPN instance.
+info-center loghost *  %logic=rulebook.huawei.syslog.loghost
+
+# Software upgrades: a typed RSA peer key, compared whole (Annet's %multiline) and sent flat:
+# V300 stores its hex nested, and a `quit` between those levels would be hex.
+*/[rd]sa/ peer-public-key * %multiline %logic=rulebook.huawei.peer_key.flat
+
+# Port protection: error-down recovery is keyed by its cause and undone without its interval
+# (with it "Too many parameters"); Annet's own rule covers link-flap only.
+error-down auto-recovery cause *

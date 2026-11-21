@@ -1,0 +1,221 @@
+diff --git a/cmd/gnetcli_server/server.go b/cmd/gnetcli_server/server.go
+index f1d9ea6..aaa18e8 100644
+--- a/cmd/gnetcli_server/server.go
++++ b/cmd/gnetcli_server/server.go
+@@ -261,6 +261,9 @@ func main() {
+ 	if cfg.DefaultCmdTimeout > 0 {
+ 		serverOpts = append(serverOpts, server.WithDefaultCmdTimeout(cfg.DefaultCmdTimeout))
+ 	}
++	if cfg.KnownHostsFile != "" {
++		serverOpts = append(serverOpts, server.WithKnownHostsFile(cfg.KnownHostsFile))
++	}
+ 	devAuthApp := server.NewAuthApp(cfg.DevAuth, logger)
+ 	s, err := server.New(devAuthApp, cfg.DevConf, serverOpts...)
+ 	if err != nil {
+diff --git a/pkg/server/conf.go b/pkg/server/conf.go
+index 45901bd..2515a7b 100644
+--- a/pkg/server/conf.go
++++ b/pkg/server/conf.go
+@@ -38,6 +38,7 @@ type Config struct {
+ 	Debug              bool          `config:"debug,short=d,description=Set debug log level"`
+ 	DefaultReadTimeout time.Duration `config:"default-read-timeout,description=Default read timeout" yaml:"default_read_timeout"`
+ 	DefaultCmdTimeout  time.Duration `config:"default-cmd-timeout,description=Default command timeout" yaml:"default_cmd_timeout"`
++	KnownHostsFile     string        `config:"known-hosts-file,description=OpenSSH known_hosts file; when set, SSH host keys are verified against it" yaml:"known_hosts_file"`
+ }
+ 
+ type LogConfig struct {
+diff --git a/pkg/server/known_hosts_test.go b/pkg/server/known_hosts_test.go
+new file mode 100644
+index 0000000..50ef9b0
+--- /dev/null
++++ b/pkg/server/known_hosts_test.go
+@@ -0,0 +1,147 @@
++package server
++
++import (
++	"context"
++	"crypto/ed25519"
++	"crypto/rand"
++	"net"
++	"os"
++	"path/filepath"
++	"strconv"
++	"strings"
++	"testing"
++	"time"
++
++	gossh "golang.org/x/crypto/ssh"
++	"golang.org/x/crypto/ssh/knownhosts"
++	"go.uber.org/zap"
++
++	"github.com/annetutil/gnetcli/pkg/credentials"
++)
++
++// startSSHServer runs a minimal SSH server on 127.0.0.1 that accepts any password
++// and every channel request. It returns its address and host key.
++func startSSHServer(t *testing.T) (string, int, gossh.PublicKey) {
++	t.Helper()
++	signer := newSigner(t)
++	conf := &gossh.ServerConfig{
++		PasswordCallback: func(gossh.ConnMetadata, []byte) (*gossh.Permissions, error) { return nil, nil },
++	}
++	conf.AddHostKey(signer)
++	ln, err := net.Listen("tcp", "127.0.0.1:0")
++	if err != nil {
++		t.Fatal(err)
++	}
++	t.Cleanup(func() { _ = ln.Close() })
++	go func() {
++		for {
++			conn, err := ln.Accept()
++			if err != nil {
++				return
++			}
++			go func(conn net.Conn) {
++				_, chans, reqs, err := gossh.NewServerConn(conn, conf)
++				if err != nil {
++					_ = conn.Close()
++					return
++				}
++				go gossh.DiscardRequests(reqs)
++				for newChan := range chans {
++					ch, chReqs, err := newChan.Accept()
++					if err != nil {
++						continue
++					}
++					go func() {
++						for req := range chReqs {
++							_ = req.Reply(true, nil)
++						}
++					}()
++					t.Cleanup(func() { _ = ch.Close() })
++				}
++			}(conn)
++		}
++	}()
++	host, portText, _ := net.SplitHostPort(ln.Addr().String())
++	port, _ := strconv.Atoi(portText)
++	return host, port, signer.PublicKey()
++}
++
++func newSigner(t *testing.T) gossh.Signer {
++	t.Helper()
++	_, key, err := ed25519.GenerateKey(rand.Reader)
++	if err != nil {
++		t.Fatal(err)
++	}
++	signer, err := gossh.NewSignerFromKey(key)
++	if err != nil {
++		t.Fatal(err)
++	}
++	return signer
++}
++
++func writeKnownHosts(t *testing.T, host string, port int, key gossh.PublicKey) string {
++	t.Helper()
++	path := filepath.Join(t.TempDir(), "known_hosts")
++	line := knownhosts.Line([]string{knownhosts.Normalize(net.JoinHostPort(host, strconv.Itoa(port)))}, key)
++	if err := os.WriteFile(path, []byte(line+"\n"), 0o600); err != nil {
++		t.Fatal(err)
++	}
++	return path
++}
++
++func connect(t *testing.T, s *Server, host string, port int) error {
++	t.Helper()
++	cfg := StreamerConfig{
++		connHost: host,
++		port:     port,
++		creds:    credentials.NewSimpleCredentials(credentials.WithUsername("user"), credentials.WithPassword("secret")),
++		logger:   zap.NewNop(),
++	}
++	conn, err := s.createStreamerSSH(cfg, nil)
++	if err != nil {
++		return err
++	}
++	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
++	defer cancel()
++	err = conn.Init(ctx)
++	conn.Close()
++	return err
++}
++
++func TestKnownHostsFileRejectsAnotherKey(t *testing.T) {
++	host, port, _ := startSSHServer(t)
++	other := newSigner(t).PublicKey()
++	s := &Server{log: zap.NewNop(), knownHostsFile: writeKnownHosts(t, host, port, other)}
++
++	err := connect(t, s, host, port)
++	if err == nil || !strings.Contains(err.Error(), "knownhosts") {
++		t.Fatalf("expected a knownhosts error, got %v", err)
++	}
++}
++
++func TestKnownHostsFileRejectsAnUnknownHost(t *testing.T) {
++	host, port, key := startSSHServer(t)
++	s := &Server{log: zap.NewNop(), knownHostsFile: writeKnownHosts(t, "192.0.2.1", port, key)}
++
++	err := connect(t, s, host, port)
++	if err == nil || !strings.Contains(err.Error(), "knownhosts") {
++		t.Fatalf("expected a knownhosts error, got %v", err)
++	}
++}
++
++func TestKnownHostsFileAcceptsThePinnedKey(t *testing.T) {
++	host, port, key := startSSHServer(t)
++	s := &Server{log: zap.NewNop(), knownHostsFile: writeKnownHosts(t, host, port, key)}
++
++	if err := connect(t, s, host, port); err != nil && strings.Contains(err.Error(), "knownhosts") {
++		t.Fatalf("pinned key refused: %v", err)
++	}
++}
++
++func TestMissingKnownHostsFileIsAnError(t *testing.T) {
++	s := &Server{log: zap.NewNop(), knownHostsFile: filepath.Join(t.TempDir(), "missing")}
++
++	if _, err := s.createStreamerSSH(StreamerConfig{connHost: "127.0.0.1", logger: zap.NewNop()}, nil); err == nil {
++		t.Fatal("expected an error for a missing known_hosts file")
++	}
++}
+diff --git a/pkg/server/server.go b/pkg/server/server.go
+index bfa1fc2..32ded95 100644
+--- a/pkg/server/server.go
++++ b/pkg/server/server.go
+@@ -61,6 +61,7 @@ type Server struct {
+ 	devAuthApp         authApp
+ 	defaultReadTimeout time.Duration
+ 	defaultCmdTimeout  time.Duration
++	knownHostsFile     string
+ }
+ 
+ type hostParams struct {
+@@ -152,6 +153,15 @@ func WithDefaultCmdTimeout(timeout time.Duration) Option {
+ 	}
+ }
+ 
++// WithKnownHostsFile verifies SSH host keys against an OpenSSH known_hosts file.
++// The file is read for every new connection, so updates apply without a restart.
++// Without this option host keys are not verified.
++func WithKnownHostsFile(path string) Option {
++	return func(h *Server) {
++		h.knownHostsFile = path
++	}
++}
++
+ func (m *Server) makeConnectArg(hostname string, params hostParams) (string, int) {
+ 	host := hostname
+ 	if params.GetIP().IsValid() {
+@@ -221,6 +231,13 @@ func (m *Server) createStreamerSSH(cfg StreamerConfig, add func(op gtrace.Operat
+ 	if cfg.port > 0 {
+ 		streamerOpts = append(streamerOpts, ssh.WithPort(cfg.port))
+ 	}
++	if m.knownHostsFile != "" {
++		knownHosts, err := ssh.WithKnownHostsFiles(m.knownHostsFile)
++		if err != nil {
++			return nil, fmt.Errorf("unable to load known hosts file %s: %w", m.knownHostsFile, err)
++		}
++		streamerOpts = append(streamerOpts, knownHosts)
++	}
+ 	connHost := cfg.connHost
+ 	if cfg.params.proxyJump != "" {
+ 		jumpHostParams, err := m.getHostParams(cfg.params.proxyJump, nil)

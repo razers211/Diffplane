@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?><data xmlns="urn:ietf:params:xml:ns:netconf:base:1.0" xmlns:nc="urn:ietf:params:xml:ns:netconf:base:1.0">
+    <network-instance xmlns="urn:huawei:yang:huawei-network-instance">
+      <instances>
+        <instance>
+          <name>_public_</name>
+          <bgp xmlns="urn:huawei:yang:huawei-bgp">
+            <base-process>
+              <peers>
+                <peer>
+                  <address>10.10.0.1</address>
+                  <afs>
+                    <af>
+                      <type>ipv4uni</type>
+                      <state>
+                        <current-state>active</current-state>
+                        <last-state>connect</last-state>
+                        <up-down-duration>0168h37m</up-down-duration>
+                        <receive-prefix>0</receive-prefix>
+                        <receive-active-prefix>0</receive-active-prefix>
+                        <advertise-prefix>0</advertise-prefix>
+                        <remote-as>65001</remote-as>
+                      </state>
+                    </af>
+                    <af>
+                      <type>evpn</type>
+                      <state>
+                        <current-state>active</current-state>
+                        <last-state>connect</last-state>
+                        <up-down-duration>0168h37m</up-down-duration>
+                        <receive-prefix>0</receive-prefix>
+                        <receive-active-prefix>0</receive-active-prefix>
+                        <advertise-prefix>0</advertise-prefix>
+                        <remote-as>65001</remote-as>
+                      </state>
+                    </af>
+                  </afs>
+                </peer>
+              </peers>
+            </base-process>
+          </bgp>
+        </instance>
+        <instance>
+          <name>_management_vpn_</name>
+        </instance>
+      </instances>
+    </network-instance>
+  </data>

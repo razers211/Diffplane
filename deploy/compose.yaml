@@ -1,0 +1,456 @@
+# Local environment. Run from this directory:
+#   python3 gen_env.py && docker compose up --build
+# NetBox publishes no ports: only the orchestrator talks to it, over the Compose network.
+name: diffplane
+
+x-netbox: &netbox
+  # Annet's NetBox adapter supports 3.4-4.6; 4.4 keeps classic (v1) API tokens.
+  image: docker.io/netboxcommunity/netbox:v4.4.10-3.4.2@sha256:14c2de3f179d8ed5b5722a76b6d7389c8c95bb8be46c600f3d7fe1f7698b4574
+  user: "unit:root"
+  environment:
+    DB_HOST: netbox-postgres
+    DB_NAME: netbox
+    DB_USER: netbox
+    DB_PASSWORD: ${NETBOX_DB_PASSWORD:?run gen_env.py to create deploy/.env}
+    REDIS_HOST: redis
+    REDIS_PASSWORD: ${REDIS_PASSWORD:?run gen_env.py to create deploy/.env}
+    REDIS_DATABASE: "0"
+    REDIS_SSL: "false"
+    REDIS_CACHE_HOST: redis
+    REDIS_CACHE_PASSWORD: ${REDIS_PASSWORD:?run gen_env.py to create deploy/.env}
+    REDIS_CACHE_DATABASE: "1"
+    REDIS_CACHE_SSL: "false"
+    SECRET_KEY: ${NETBOX_SECRET_KEY:?run gen_env.py to create deploy/.env}
+    LOGIN_REQUIRED: "true"
+    CENSUS_REPORTING_ENABLED: "false"
+    SUPERUSER_NAME: admin
+    SUPERUSER_EMAIL: admin@localhost
+    SUPERUSER_PASSWORD: ${NETBOX_SUPERUSER_PASSWORD:?run gen_env.py to create deploy/.env}
+    # Created once, on first start, for the superuser.
+    SUPERUSER_API_TOKEN: ${NETBOX_TOKEN:?run gen_env.py to create deploy/.env}
+  volumes:
+    - netbox-media:/opt/netbox/netbox/media
+
+services:
+  netbox:
+    <<: *netbox
+    depends_on:
+      netbox-postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: curl -f http://localhost:8080/login/ || exit 1
+      # First start runs all migrations, which can take several minutes. Failed checks
+      # in this window don't count, and the first success marks NetBox healthy at once.
+      start_period: 600s
+      timeout: 3s
+      interval: 15s
+
+  netbox-worker:
+    <<: *netbox
+    depends_on:
+      netbox:
+        condition: service_healthy
+    command:
+      - /opt/netbox/venv/bin/python
+      - /opt/netbox/netbox/manage.py
+      - rqworker
+    healthcheck:
+      test: ps -aux | grep -v grep | grep -q rqworker || exit 1
+      start_period: 20s
+      timeout: 3s
+      interval: 15s
+
+  netbox-postgres:
+    image: docker.io/postgres:17-alpine@sha256:266d3c257594e195b309ae9d1805e54c788f1d7b375f56bf6c367aac6c917e7b
+    # JIT off: NetBox's config-context query is complex but runs on tiny tables, and compiling
+    # it cost 1-3 s per device lookup; Annet fetches every device with its context. Measured:
+    # one device with context 2.8-3.2 s -> 0.45 s,
+    # a small fabric's device list 1.35 s -> 0.17 s.
+    command: ["postgres", "-c", "jit=off"]
+    environment:
+      POSTGRES_DB: netbox
+      POSTGRES_USER: netbox
+      POSTGRES_PASSWORD: ${NETBOX_DB_PASSWORD:?run gen_env.py to create deploy/.env}
+    healthcheck: &pg-healthcheck
+      test: pg_isready -q -t 2 -d $$POSTGRES_DB -U $$POSTGRES_USER
+      start_period: 20s
+      timeout: 30s
+      interval: 10s
+      retries: 5
+    volumes:
+      - netbox-postgres-data:/var/lib/postgresql/data
+
+  # Platform database: jobs, approvals, diff snapshots, users. Separate from NetBox's.
+  postgres:
+    image: docker.io/postgres:17-alpine@sha256:266d3c257594e195b309ae9d1805e54c788f1d7b375f56bf6c367aac6c917e7b
+    environment:
+      POSTGRES_DB: platform
+      POSTGRES_USER: platform
+      POSTGRES_PASSWORD: ${PLATFORM_DB_PASSWORD:?run gen_env.py to create deploy/.env}
+    healthcheck: *pg-healthcheck
+    volumes:
+      - platform-postgres-data:/var/lib/postgresql/data
+
+  # Daily backups of both databases and NetBox media into deploy/backups/ (kept 14 days).
+  backup:
+    image: docker.io/postgres:17-alpine@sha256:266d3c257594e195b309ae9d1805e54c788f1d7b375f56bf6c367aac6c917e7b
+    entrypoint: ["/backup.sh"]
+    environment:
+      NETBOX_DB_PASSWORD: ${NETBOX_DB_PASSWORD:?run gen_env.py to create deploy/.env}
+      PLATFORM_DB_PASSWORD: ${PLATFORM_DB_PASSWORD:?run gen_env.py to create deploy/.env}
+      BACKUP_KEEP_DAYS: "14"
+      BACKUP_INTERVAL_SECONDS: "86400"
+    volumes:
+      - ./backup/backup.sh:/backup.sh:ro
+      - ./backups:/backups
+      - netbox-media:/netbox-media:ro
+    depends_on:
+      netbox-postgres:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+
+  # Shared by NetBox (DB 0 tasks, DB 1 cache) and, later, the orchestrator's job queue.
+  redis:
+    image: docker.io/valkey/valkey:8.1-alpine@sha256:2602ace2be6569bc2bbb06f873776516ab9089821525be34f4305c67eb9db02a
+    command:
+      - sh
+      - -c
+      - valkey-server --appendonly yes --requirepass $$REDIS_PASSWORD
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?run gen_env.py to create deploy/.env}
+    healthcheck:
+      test: '[ "$$(valkey-cli --pass "$$REDIS_PASSWORD" --no-auth-warning ping)" = "PONG" ]'
+      start_period: 5s
+      timeout: 3s
+      interval: 2s
+      retries: 5
+    volumes:
+      - redis-data:/data
+
+  orchestrator:
+    image: diffplane-orchestrator:local
+    build: &app-build
+      context: ..
+      dockerfile: orchestrator/Dockerfile
+    # Hardened: no capabilities (so no privilege gain), a read-only root filesystem (writes go to
+    # /tmp and the named volumes).
+    cap_drop: [ALL]
+    read_only: true
+    tmpfs: [/tmp]
+    environment:
+      NETBOX_URL: http://netbox:8080
+      NETBOX_TOKEN: ${NETBOX_TOKEN:?run gen_env.py to create deploy/.env}
+      PROMETHEUS_URL: http://prometheus:9090
+      # Prometheus' scrape of /metrics must send it (Authorization: Bearer).
+      METRICS_TOKEN: ${METRICS_TOKEN:?run gen_env.py to create deploy/.env}
+      # Fabrics (site slugs) the orchestrator may deploy to. Never production without a deliberate decision.
+      DEPLOY_ALLOWED_SITES: ${DEPLOY_ALLOWED_SITES:-}
+      # Scheduled drift check: fabric-wide annet diff, every 15 minutes by default.
+      DRIFT_INTERVAL_SECONDS: ${DRIFT_INTERVAL_SECONDS:-900}
+      ANOMALY_MIN_BPS: ${ANOMALY_MIN_BPS:-10000000}   # both lowered only for a lab test
+      ANOMALY_MIN_SHARE: ${ANOMALY_MIN_SHARE:-0.01}
+      # the flows pages read ClickHouse (the flows service writes it).
+      CLICKHOUSE_URL: http://clickhouse:8123
+      CLICKHOUSE_USER: flows
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:?add CLICKHOUSE_PASSWORD to deploy/.env (docs/operations.md, Flows)}
+      # HTTPS only, self-signed (orchestrator/tls.py): the session cookie is never sent over HTTP.
+      COOKIE_SECURE: ${COOKIE_SECURE:-true}
+      # Names and addresses the certificate is valid for; add the production name(s).
+      TLS_HOSTNAMES: ${TLS_HOSTNAMES:-localhost,127.0.0.1,orchestrator}
+      DATABASE_URL: postgresql+asyncpg://platform:${PLATFORM_DB_PASSWORD:?run gen_env.py to create deploy/.env}@postgres:5432/platform
+      # Encrypts the kept switch configs. Empty: backups are off and the GUI says so.
+      CONFIG_BACKUP_KEY: ${CONFIG_BACKUP_KEY:-}
+      # Device names are short hostnames, not FQDNs: Annet must match them exactly.
+      NETBOX_EXACT_HOST_FILTER: "true"
+      # SSH host keys gnetcli verifies against (our patch, deploy/gnetcli/). Rewritten from
+      # the NetBox pins before every diff, patch and deploy (orchestrator/hostkeys.py).
+      KNOWN_HOSTS_FILE: /tmp/fabric_known_hosts
+      # Device SSH login for gnetcli (fetch/deploy). Not needed for `annet gen`.
+      GNETCLI_DEV_LOGIN: ${GNETCLI_DEV_LOGIN:-}
+      GNETCLI_DEV_PASSWORD: ${GNETCLI_DEV_PASSWORD:-}
+      # SNMP v2c read community the Snmp generator puts on the switches.
+      SNMP_COMMUNITY: ${SNMP_COMMUNITY:-}
+      # DFS group key for M-LAG pairs (Mlag generator). Required to generate leaves.
+      MLAG_DFS_PASSWORD: ${MLAG_DFS_PASSWORD:-}
+      # Zero-touch provisioning: the orchestrator writes dnsmasq's files into /ztp.
+      # The first-boot config creates the platform accounts above and this admin account.
+      COLLECTOR_LOGIN: ${COLLECTOR_LOGIN:-}
+      COLLECTOR_PASSWORD: ${COLLECTOR_PASSWORD:-}
+      ZTP_ADMIN_LOGIN: ${ZTP_ADMIN_LOGIN:-}
+      ZTP_ADMIN_PASSWORD: ${ZTP_ADMIN_PASSWORD:-}
+      ZTP_DIR: /ztp
+      # GUI settings for the collector: its login, written here, read by the collector.
+      PLATFORM_SHARED: /shared
+      # Alertmanager's receiver from the GUI's settings: config written here, then reloaded.
+      ALERTMANAGER_CONFIG: /alertmanager-config/alertmanager.yml
+      ALERTMANAGER_URL: http://alertmanager:9093
+      ZTP_DHCP_INTERFACE: ${ZTP_DHCP_INTERFACE:-}
+      ZTP_DHCP_NETWORK: ${ZTP_DHCP_NETWORK:-}
+      ZTP_SERVER_ADDRESS: ${ZTP_SERVER_ADDRESS:-}
+      ZTP_WINDOW_HOURS: ${ZTP_WINDOW_HOURS:-24}   # a registration is served this long, then expires
+      SFTP_ADDRESS: ${SFTP_ADDRESS:-}   # where the switches reach the image server (also in Settings)
+      SFTP_PORT: ${SFTP_PORT:-2222}   # the port the switches download from (the published one)
+    volumes:
+      # Fabric definitions, seed script, generators and rulebook, editable without rebuilding the image.
+      - ../seed:/app/seed:ro
+      - ../generators:/app/generators:ro
+      - ../rulebook:/app/rulebook:ro
+      - ../collector:/app/collector:ro
+      # Certificate and key; certificate only, for Prometheus.
+      - orchestrator-tls:/tls
+      - orchestrator-tls-public:/tls-public
+      - ztp:/ztp
+      - platform-shared:/shared
+      - alertmanager-config:/alertmanager-config
+      - software-images:/images   # uploaded switch software
+      - sftp-progress:/progress:ro   # how far each download is, written by sftpd
+    depends_on:
+      netbox:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    ports:
+      # 127.0.0.1 on a workstation; 0.0.0.0 on a server (every interface).
+      - "${ORCHESTRATOR_BIND:-127.0.0.1}:${ORCHESTRATOR_PORT:-8000}:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import ssl, urllib.request; urllib.request.urlopen('https://localhost:8000/health', timeout=5, context=ssl.create_default_context(cafile='/tls/fabric.crt'))"]
+      start_period: 10s
+      timeout: 6s
+      interval: 15s
+
+  # Read-only state collection (NETCONF <get> only). Same image as the orchestrator.
+  collector:
+    image: diffplane-orchestrator:local
+    build: *app-build
+    # Hardened: no capabilities (so no privilege gain), a read-only root filesystem (writes go to
+    # /tmp and the named volumes).
+    cap_drop: [ALL]
+    read_only: true
+    tmpfs: [/tmp]
+    command: ["python", "-m", "collector"]
+    environment:
+      NETBOX_URL: http://netbox:8080
+      NETBOX_TOKEN: ${NETBOX_TOKEN:?run gen_env.py to create deploy/.env}
+      COLLECTOR_LOGIN: ${COLLECTOR_LOGIN:-}
+      COLLECTOR_PASSWORD: ${COLLECTOR_PASSWORD:-}
+      # interface counters every 5 s, state and LLDP every 25 s.
+      COLLECTOR_COUNTER_INTERVAL: "5"
+      COLLECTOR_INTERVAL: "25"
+      # BGP/EVPN peers, OSPF neighbours, route and MAC counts, M-LAG, VXLAN tunnels, with every
+      # state poll (25 s; the counters slot has no room for them).
+      COLLECTOR_CONTROL_INTERVAL: "25"
+      # fans, power, CPU, memory, temperatures and optics in alternate state slots, each every 50 s
+      #.
+      COLLECTOR_HARDWARE_INTERVAL: "50"
+      PLATFORM_SHARED: /shared   # the login set in the GUI's settings, re-read at each reconnect
+    volumes:
+      - ../collector:/app/collector:ro
+      - platform-shared:/shared:ro
+    depends_on:
+      netbox:
+        condition: service_healthy
+    restart: on-failure:3
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:9108/metrics', timeout=5)"]
+      start_period: 10s
+      timeout: 6s
+      interval: 30s
+
+  # NetStream flows. GoFlow2 inside the flows service decodes them;
+  # ClickHouse keeps raw rows 7 days, per minute 90 days, per hour by segment pair 13 months.
+  clickhouse:
+    image: docker.io/clickhouse/clickhouse-server:25.3.14.14@sha256:b627d7a9bc0e0c1bac26cdbe9d2fc6316faa29c5d8a174f28f5abd57d0fa6ba2
+    environment:
+      CLICKHOUSE_DB: flows
+      CLICKHOUSE_USER: flows
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:?add CLICKHOUSE_PASSWORD to deploy/.env (docs/operations.md, Flows)}
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "0"
+    volumes:
+      - clickhouse-data:/var/lib/clickhouse
+    ulimits:
+      nofile: {soft: 262144, hard: 262144}
+    restart: unless-stopped
+
+  flows:
+    image: diffplane-orchestrator:local
+    build: *app-build
+    # Hardened: no capabilities (so no privilege gain), a read-only root filesystem (writes go to
+    # /tmp and the named volumes).
+    cap_drop: [ALL]
+    read_only: true
+    tmpfs: [/tmp]
+    command: ["python", "-m", "flows"]
+    environment:
+      NETBOX_URL: http://netbox:8080
+      NETBOX_TOKEN: ${NETBOX_TOKEN:?run gen_env.py to create deploy/.env}
+      PROMETHEUS_URL: http://prometheus:9090
+      CLICKHOUSE_URL: http://clickhouse:8123
+      CLICKHOUSE_USER: flows
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:?add CLICKHOUSE_PASSWORD to deploy/.env (docs/operations.md, Flows)}
+      FLOWS_PORT: "2055"
+    # The switches export over MEth (_management_vpn_) to the address on the Fabric page: set
+    # FLOWS_BIND to that address of this host, never wider
+    # than needed. Localhost by default, like the orchestrator. Unknown exporters are dropped.
+    ports:
+      - "${FLOWS_BIND:-127.0.0.1}:${FLOWS_PORT:-2055}:2055/udp"
+    volumes:
+      - ../flows:/app/flows:ro
+    depends_on:
+      netbox:
+        condition: service_healthy
+      clickhouse:
+        condition: service_started
+    restart: on-failure:3
+
+  # Syslog from the switches: only messages of known switches, into ClickHouse for 90 days.
+  syslog:
+    image: diffplane-orchestrator:local
+    build: *app-build
+    # Hardened: no capabilities (so no privilege gain), a read-only root filesystem (writes go to
+    # /tmp and the named volumes).
+    cap_drop: [ALL]
+    read_only: true
+    tmpfs: [/tmp]
+    command: ["python", "-m", "syslogs"]
+    environment:
+      NETBOX_URL: http://netbox:8080
+      NETBOX_TOKEN: ${NETBOX_TOKEN:?run gen_env.py to create deploy/.env}
+      CLICKHOUSE_URL: http://clickhouse:8123
+      CLICKHOUSE_USER: flows
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:?add CLICKHOUSE_PASSWORD to deploy/.env (docs/operations.md, Flows)}
+      SYSLOG_LISTEN_PORT: "5514"   # the container runs as nobody: no port under 1024
+    # The switches send over MEth (_management_vpn_) to the Fabric page's receiver address: set
+    # SYSLOG_BIND to that address of this host, and SYSLOG_PORT to that page's port. Localhost by default.
+    ports:
+      - "${SYSLOG_BIND:-127.0.0.1}:${SYSLOG_PORT:-514}:5514/udp"
+    volumes:
+      - ../syslogs:/app/syslogs:ro
+    depends_on:
+      netbox:
+        condition: service_healthy
+      clickhouse:
+        condition: service_started
+    restart: on-failure:3
+
+  # Read-only SFTP for switch software images: the switches pull an upgrade's image over MEth
+  # (_management_vpn_) with a one-time account. Set SFTP_BIND to this host's address the switches
+  # reach (the platform address in Settings) and SFTP_PORT to its port. Localhost by default.
+  sftpd:
+    image: diffplane-orchestrator:local
+    build: *app-build
+    # Hardened: no capabilities (so no privilege gain), a read-only root filesystem (writes go to
+    # /tmp and the named volumes).
+    cap_drop: [ALL]
+    read_only: true
+    tmpfs: [/tmp]
+    command: ["python", "-m", "sftpd"]
+    environment:
+      SFTP_LISTEN_PORT: "2222"   # the container runs as nobody: no port under 1024
+      PLATFORM_SHARED: /shared
+    ports:
+      - "${SFTP_BIND:-127.0.0.1}:${SFTP_PORT:-2222}:2222"
+    volumes:
+      - orchestrator-tls:/tls:ro   # its host key, made by the orchestrator
+      - platform-shared:/shared:ro   # the one-time accounts
+      - software-images:/images:ro
+      - sftp-progress:/progress   # the bytes sent per login, for the upgrade page
+    restart: on-failure:3
+
+  # DHCP and TFTP for zero-touch provisioning. Off unless started with
+  # `docker compose --profile ztp up -d`. Host networking: it answers on the management network
+  # (ZTP_DHCP_INTERFACE), only to registered MACs, each with its fixed address, never a pool.
+  ztp:
+    build:
+      context: ./ztp
+    image: diffplane-ztp:local
+    profiles: ["ztp"]
+    network_mode: host
+    cap_add: [NET_ADMIN]
+    volumes:
+      - ztp:/ztp:ro
+    restart: unless-stopped
+
+  prometheus:
+    image: docker.io/prom/prometheus:v3.15.0@sha256:efd719c99d83b060d9daefdcf00360461adf279f45ef5391f8d111892118753e
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - orchestrator-tls-public:/tls-public:ro   # to verify the orchestrator's certificate
+      - prometheus-data:/prometheus
+    secrets: [metrics_token]   # /run/secrets/metrics_token, sent with each scrape of /metrics
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:9090/-/ready"]
+      start_period: 10s
+      timeout: 3s
+      interval: 15s
+
+  # Receives Prometheus' alerts; receiver from the GUI. No published port: list alerts with
+  # amtool inside the container (docs/operations.md, Alerts).
+  alertmanager:
+    image: docker.io/prom/alertmanager:v0.34.1@sha256:e9733bafb1bdef9b00e25a21f8f99dc26a22224bf16641ad754d1649f4c3357a
+    # Its configuration is the orchestrator's (receiver set in the GUI, orchestrator/alerting.py).
+    command: ["--config.file=/config/alertmanager.yml", "--storage.path=/alertmanager"]
+    volumes:
+      - alertmanager-config:/config:ro
+      - alertmanager-data:/alertmanager
+    depends_on:
+      orchestrator:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:9093/-/ready"]
+      start_period: 10s
+      timeout: 3s
+      interval: 15s
+
+  # Test directory only: `docker compose --profile directory-test up -d`.
+  # Throwaway users (deploy/directory-test/); never part of a normal start, no published port.
+  directory-ldap:
+    profiles: ["directory-test"]
+    image: docker.io/osixia/openldap:1.5.0@sha256:18742e9c449c9c1afe129d3f2f3ee15fb34cc43e5f940a20f3399728f41d7c28
+    hostname: directory-ldap
+    command: ["--copy-service"]
+    environment:
+      LDAP_ORGANISATION: Example
+      LDAP_DOMAIN: example.net
+      LDAP_ADMIN_PASSWORD: ldap-test-admin
+      LDAP_TLS: "true"
+      LDAP_TLS_VERIFY_CLIENT: never
+      # Our own test certificate (directory-test/make-certs.sh): the image's bundled one has expired.
+      LDAP_TLS_CRT_FILENAME: ldap.crt
+      LDAP_TLS_KEY_FILENAME: ldap.key
+      LDAP_TLS_CA_CRT_FILENAME: ca.crt
+    volumes:
+      - ./directory-test/bootstrap.ldif:/container/service/slapd/assets/config/bootstrap/ldif/custom/50-test.ldif:ro
+      - ./directory-test/certs/ldap.crt:/container/service/slapd/assets/certs/ldap.crt:ro
+      - ./directory-test/certs/ldap.key:/container/service/slapd/assets/certs/ldap.key:ro
+      - ./directory-test/certs/ca.crt:/container/service/slapd/assets/certs/ca.crt:ro
+
+  directory-radius:
+    profiles: ["directory-test"]
+    image: docker.io/freeradius/freeradius-server:3.2.3@sha256:1ca67fbd54c319029750051671341f5ea96b9bb5ea76198e81548593b4d41a70
+    volumes:
+      - ./directory-test/clients.conf:/etc/raddb/clients.conf:ro
+      - ./directory-test/authorize:/etc/raddb/mods-config/files/authorize:ro
+
+volumes:
+  netbox-media:
+  netbox-postgres-data:
+  platform-postgres-data:
+  redis-data:
+  prometheus-data:
+  alertmanager-data:
+  alertmanager-config:
+  orchestrator-tls:
+  orchestrator-tls-public:
+  ztp:
+  platform-shared:
+  clickhouse-data:
+  software-images:
+  sftp-progress:
+
+secrets:
+  metrics_token:
+    environment: METRICS_TOKEN

@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "diffplane-orchestrator"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "httpx>=0.27",
+    "uvicorn>=0.30",
+    "pyyaml>=6",
+    # Pinned: generator output and patch behaviour depend on the exact Annet rulebook.
+    "annet[netbox]==4.6.14",
+    "gnetcli_adapter==2.8.5",
+    "ncclient==0.7.1",
+    "cryptography>=42",       # config backups encrypted with Fernet; already pulled in by paramiko
+    "ldap3==2.9.1",           # Active Directory sign-in over LDAPS
+    "pyrad==2.4",             # RADIUS sign-in
+    "prometheus_client==0.26.0",
+    "sqlalchemy[asyncio]==2.1.3",
+    "asyncpg==0.31.0",
+    "alembic==1.20.0",
+]
+
+[project.optional-dependencies]
+# pgserver: embedded PostgreSQL for the database tests
+test = ["pytest>=8", "pgserver==0.1.4"]
+
+[tool.setuptools]
+packages = ["orchestrator", "orchestrator.routers", "orchestrator.migrations", "orchestrator.migrations.versions", "seed", "generators", "collector", "flows", "syslogs", "sftpd", "rulebook", "rulebook.texts", "rulebook.huawei"]
+
+[tool.setuptools.package-data]
+"rulebook.texts" = ["*.rul", "*.order", "*.deploy"]
+"orchestrator" = ["radius.dict"]
+"orchestrator.migrations" = ["script.py.mako"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

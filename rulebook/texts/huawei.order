@@ -1,0 +1,109 @@
+%inherit_from=annet.rulebook.texts.huawei
+# Our changes to Annet's Huawei ordering. Each rule here has a test in tests/rulebook/.
+# A removal with an "undo ... %order_reverse" rule is sent at the position written here;
+# other removals follow Annet's defaults. Anchors (rules also in the parent) must keep the
+# parent's relative order.
+
+# Microsegmentation (V300R025): the policy objects need only `traffic-segment enable` and each
+# other (a classifier may name EPGs the switch does not have: Huawei's guide), so they come first;
+# a contract leaves the policy before its classifier and behavior go, and every EPG goes before
+# the VPN instances and bridge domains its members name (removed below). EPGs are made after them
+# (the bridge-domain anchor further down). Removal order as accepted on a test switch.
+traffic-segment enable
+# Learn <-> Enforce: the old default policy goes before the new one is typed.
+undo traffic-segment default-policy %order_reverse
+traffic-segment default-policy
+undo segment-policy %order_reverse
+undo segment policy %order_reverse
+segment behavior
+segment classifier
+segment policy
+segment-policy
+undo segment classifier %order_reverse
+undo segment behavior %order_reverse
+undo traffic-segment segment-id %order_reverse
+undo traffic-segment enable %order_reverse
+
+dfs-group
+# V-STP right after the DFS group, as ref-leaf1's running config lists it.
+stp v-stp
+
+# A segment's VPN instance (<name>-<bd>) is removed before any instance is created: a
+# renamed segment's new instance takes the same RD and L3 VNI, which V300 refuses while the old
+# instance exists (a test switch). Annet removes VPN instances last otherwise.
+undo ip vpn-instance */[A-Za-z][A-Za-z0-9_-]*-\d+/ %order_reverse
+ip vpn-instance
+# The OSPF process before the interfaces that join it with "ospf enable <process>"
+# (Annet's own "ospf" rule sits after the interfaces), after the VPN instances it may name,
+# and before LoopBack1 below.
+ospf */\d+/
+# LoopBack0 and 1 before LoopBack2 (which the relay rule below puts early): moving a pair to the PIP
+# layout moves the VTEP address from LoopBack1 to LoopBack2, and V300 refuses it on LoopBack2
+# while LoopBack1 still holds it ("The specified address conflicts with the address of LoopBack1.").
+interface */LoopBack[01]$/
+# A DHCP relay loopback (LoopBack2-1023): after its VPN instance (it binds to it), before the
+# VBDIF naming it as giaddr (Annet's own order puts loopbacks after VBDIFs). It and `dhcp enable`
+# are removed after the VBDIFs stopped relaying (the undo rules after "interface *" below).
+interface */LoopBack([2-9]|[1-9]\d|[1-9]\d\d|10[01]\d|102[0-3])$/
+
+# An EPG's members name VPN instances and bridge domains: after both exist.
+bridge-domain *
+traffic-segment segment-id
+
+# The keychain before the interfaces naming it, removed after they left it.
+keychain
+
+bfd
+
+# A NetStream record exists before a port uses it; removed after the ports left it.
+netstream
+
+interface *
+    # An L2 sub-interface's encapsulation before its bridge domain (order; our `bridge-domain *`
+    # rule in huawei.rul would otherwise put it first), and leaving one bridge domain before joining another.
+    undo bridge-domain
+    encapsulation
+    bridge-domain
+    # A copper port's fixed speed: V300 refuses `speed <n>` while negotiating, so negotiation goes
+    # off first; the old speed is undone before (a lab test).
+    undo speed %order_reverse
+    undo negotiation %order_reverse
+    negotiation
+    speed
+# Teardown, after the "interface *" blocks above (member ports leave their trunks,
+# interfaces leave OSPF). Order matters: each step removes what the next depends on.
+undo ospf */\d+/ %order_reverse %insert_to_end_group
+undo keychain %order_reverse %insert_to_end_group
+undo interface */Nve\d+/ %order_reverse %insert_to_end_group
+undo netstream record %order_reverse %insert_to_end_group
+undo interface */LoopBack([2-9]|[1-9]\d|[1-9]\d\d|10[01]\d|102[0-3])$/ %order_reverse %insert_to_end_group
+undo dhcp enable %order_reverse %insert_to_end_group
+
+# Anchors below must follow Annet's order: "bgp" comes before Annet's own
+# "undo interface */Eth-Trunk.../" and "undo bridge-domain" rules.
+bgp
+    peer * local-as *
+    # A peer's source address is set right after the peer is declared, before any
+    # address family enables it, so the session never starts from the wrong address.
+    peer * connect-interface
+
+# SNMPv3: a user's group before the user, the user before a trap target naming it; removed
+# the other way round. Anchored on the parent's community and target-host rules.
+snmp-agent community
+snmp-agent group
+snmp-agent usm-user
+snmp-agent target-host
+snmp-agent protocol
+undo snmp-agent protocol %order_reverse
+undo snmp-agent target-host %order_reverse
+undo snmp-agent usm-user %order_reverse
+undo snmp-agent group %order_reverse
+# A version turned off only once no target host, user or group needs it (V300 refuses it before).
+snmp-agent sys-info version * disable
+
+undo interface */Eth-Trunk\d+/ %order_reverse %insert_to_end_group
+undo dfs-group %order_reverse %insert_to_end_group
+undo stp v-stp %order_reverse %insert_to_end_group
+undo interface */LoopBack\d+/ %order_reverse %insert_to_end_group
+undo bridge-domain %order_reverse %insert_to_end_group
+undo evpn-overlay %order_reverse %insert_to_end_group

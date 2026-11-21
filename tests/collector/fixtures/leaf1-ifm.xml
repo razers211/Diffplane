@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Reply shape for collector.state.FILTER. Interface names, classes and oper-status are
+  from a test switch's reply. The neighbour on 100GE1/0/2 is SYNTHETIC:
+  the test switch has no LLDP neighbours, so it is written from the switch's own
+  huawei-lldp YANG module (neighbors/neighbor, leaves not deviated for CE6863).
+  MEth0/0/0's mib-statistics are from a test switch's reply; 100GE1/0/2's
+  error and discard counts are SYNTHETIC (the test switch has no traffic on it).
+-->
+<data xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">
+  <ifm xmlns="urn:huawei:yang:huawei-ifm">
+    <interfaces>
+      <interface>
+        <name>100GE1/0/1</name><index>5</index>
+        <class>main-interface</class>
+        <dynamic><oper-status>down</oper-status><bandwidth>100000000000</bandwidth></dynamic>
+        <lldp xmlns="urn:huawei:yang:huawei-lldp"><session/></lldp>
+      </interface>
+      <interface>
+        <name>100GE1/0/2</name>
+        <class>main-interface</class>
+        <dynamic><oper-status>up</oper-status></dynamic>
+        <mib-statistics>
+          <receive-byte>1000</receive-byte><send-byte>2000</send-byte>
+          <receive-error-packet>3</receive-error-packet><send-error-packet>0</send-error-packet>
+          <receive-drop-packet>5</receive-drop-packet><send-drop-packet>7</send-drop-packet>
+        </mib-statistics>
+        <lldp xmlns="urn:huawei:yang:huawei-lldp">
+          <session>
+            <neighbors>
+              <neighbor>
+                <index>1</index>
+                <chassis-id-sub-type>mac-address</chassis-id-sub-type>
+                <chassis-id>0200-0000-00f1</chassis-id>
+                <port-id-sub-type>interface-name</port-id-sub-type>
+                <port-id>100GE1/0/9</port-id>
+                <port-description>to leaf1</port-description>
+                <system-name>spine1</system-name>
+              </neighbor>
+            </neighbors>
+          </session>
+        </lldp>
+      </interface>
+      <interface>
+        <name>MEth0/0/0</name><index>4</index>
+        <class>main-interface</class>
+        <dynamic><oper-status>up</oper-status><bandwidth>100000000</bandwidth></dynamic>
+        <mib-statistics>
+          <receive-byte>46349930</receive-byte><send-byte>54195782</send-byte>
+          <receive-error-packet>0</receive-error-packet><send-error-packet>0</send-error-packet>
+          <receive-drop-packet>0</receive-drop-packet><send-drop-packet>0</send-drop-packet>
+        </mib-statistics>
+        <lldp xmlns="urn:huawei:yang:huawei-lldp"><session/></lldp>
+      </interface>
+      <interface>
+        <name>Eth-Trunk1.500</name>
+        <class>sub-interface</class>
+        <dynamic><oper-status>down</oper-status><bandwidth>0</bandwidth></dynamic>
+      </interface>
+    </interfaces>
+  </ifm>
+</data>
