@@ -10,7 +10,7 @@ dependencies = [
     "fastapi>=0.115",
     "httpx>=0.27",
     "uvicorn>=0.30",
-    "pyyaml>=6",
+    "pyyaml>=6.0.3",
     # Pinned: generator output and patch behaviour depend on the exact Annet rulebook.
     "annet[netbox]==4.6.14",
     "gnetcli_adapter==2.8.5",
