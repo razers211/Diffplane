@@ -17,6 +17,6 @@ fi
 # -e CI without a value passes the host's CI only when it is set (CI sets CI=true).
 exec docker run --rm -u root -e CI -v "$PWD":/app -w /app --entrypoint sh "$IMAGE" -c '
   [ $# -gt 0 ] || set -- tests
-  apk add -q --no-cache postgresql17 && pip install -q --root-user-action=ignore "pytest>=8" &&
+  apk add -q --no-cache --no-scripts postgresql17 && pip install -q --root-user-action=ignore "pytest>=8" &&
   exec su -s /bin/sh nobody -c "HOME=/tmp PYTHONPATH=/app exec python -m pytest -q -p no:cacheprovider \"\$@\"" sh -- "$@"
 ' sh "$@"

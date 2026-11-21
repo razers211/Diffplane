@@ -49,5 +49,6 @@ updates:
     groups:
       compose: {patterns: ["*"]}
     ignore:
+      # Versions are year.month: stay on the LTS line (25.3), patches only.
       - dependency-name: "clickhouse/clickhouse-server"
-        update-types: ["version-update:semver-major"]
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
