@@ -30,7 +30,7 @@ RUN git clone --quiet --depth 1 --branch ${GOFLOW2_VERSION} https://github.com/n
  && CGO_ENABLED=0 go build -o /out/goflow2 ./cmd/goflow2
 
 # GUI: built once here, served by the orchestrator at /ui/.
-FROM docker.io/node:24-bookworm-slim@sha256:c86ecead9e55a5210ac1727de38a4ca840bf03dcaf34dc9749addbf383b1920c AS gui
+FROM docker.io/node:24-bookworm-slim@sha256:dc26ae92c9fb15cf6b1d63e20f0944b2efe0f115b20e00be48fb23fceb061c54 AS gui
 WORKDIR /gui
 COPY gui/package.json gui/package-lock.json ./
 RUN npm ci --no-audit --no-fund
@@ -39,7 +39,7 @@ RUN npm test && npm run build
 
 # Alpine: no util-linux, systemd, perl or the rest of Debian's base system, whose CVEs Debian had
 # not fixed. Every locked dependency installs from a musl wheel; the Go binaries are static.
-FROM docker.io/python:3.12-alpine@sha256:e6dae589c1c05976188fd3bd019afd091445fc533ed2ea29001beddc7368a9c8
+FROM docker.io/python:3.12-alpine@sha256:c5ba3deef00c7758561a0f03c26f44f10589263d40e732b8748e0d1f38f6dd89
 
 COPY --from=gnetcli /out/gnetcli_server /usr/local/bin/gnetcli_server
 COPY --from=goflow2 /out/goflow2 /usr/local/bin/goflow2
