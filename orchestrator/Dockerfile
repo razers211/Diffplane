@@ -39,7 +39,7 @@ RUN npm test && npm run build
 
 # Alpine: no util-linux, systemd, perl or the rest of Debian's base system, whose CVEs Debian had
 # not fixed. Every locked dependency installs from a musl wheel; the Go binaries are static.
-FROM docker.io/python:3.12-alpine@sha256:e6dae589c1c05976188fd3bd019afd091445fc533ed2ea29001beddc7368a9c8
+FROM docker.io/python:3.15-alpine@sha256:0f9552bb28711333da16915ec146f5e6bb44a7fdac9ced15dc17c2e0206346dd
 
 COPY --from=gnetcli /out/gnetcli_server /usr/local/bin/gnetcli_server
 COPY --from=goflow2 /out/goflow2 /usr/local/bin/goflow2
