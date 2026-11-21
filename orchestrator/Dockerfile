@@ -8,7 +8,7 @@
 # Both Go tools are built with a supported Go, and their dependencies with known CVEs are raised
 # to fixed versions (`go get`; x/net brings matching x/crypto and x/text). The upstream releases
 # stay pinned, and their whole test suites run. Raise them again when `trivy image` reports more.
-FROM docker.io/golang:1.27-bookworm@sha256:d9b6a1beb9474adc2a1ce842573639b44b2a0dd49b6669f51d3821baf9ec37c9 AS gnetcli
+FROM docker.io/golang:1.27-bookworm@sha256:4fa7c968ba93f1635670522dbb01a2c78150443e1385746924566079f36570ea AS gnetcli
 ARG GNETCLI_VERSION=v1.3.17
 COPY deploy/gnetcli/known-hosts.patch /tmp/known-hosts.patch
 RUN git clone --quiet --depth 1 --branch ${GNETCLI_VERSION} https://github.com/annetutil/gnetcli /src/gnetcli \
@@ -20,7 +20,7 @@ RUN git clone --quiet --depth 1 --branch ${GNETCLI_VERSION} https://github.com/a
  && CGO_ENABLED=0 go build -o /out/gnetcli_server ./cmd/gnetcli_server
 
 # GoFlow2: the NetFlow v9 decoder the flows service runs (python -m flows). Pinned.
-FROM docker.io/golang:1.27-bookworm@sha256:d9b6a1beb9474adc2a1ce842573639b44b2a0dd49b6669f51d3821baf9ec37c9 AS goflow2
+FROM docker.io/golang:1.27-bookworm@sha256:4fa7c968ba93f1635670522dbb01a2c78150443e1385746924566079f36570ea AS goflow2
 ARG GOFLOW2_VERSION=v2.2.3
 RUN git clone --quiet --depth 1 --branch ${GOFLOW2_VERSION} https://github.com/netsampler/goflow2 /src/goflow2 \
  && cd /src/goflow2 \
