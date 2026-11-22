@@ -27,6 +27,8 @@ Then try the main loop: **Network › Segments**, create a segment and attach it
 **Changes › Pending** shows the patch each switch would get. `scripts/demo.sh down` stops it,
 `scripts/demo.sh reset` deletes its data.
 
+![Segments on a leaf's front panel: web, db and storage on their ports](docs/images/ports.png)
+
 ## Why
 
 Running an EVPN fabric by hand means typing the same VXLAN, VPN-instance and BGP blocks on every

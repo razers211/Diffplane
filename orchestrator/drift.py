@@ -136,7 +136,9 @@ def metrics(report: list[dict], scheduler: SchedulerState | None) -> bytes:
         Gauge("fabric_drift_interval_seconds", "Drift check interval", registry=registry).set(scheduler.interval)
         # Absent until a run has started (an unset gauge would read 0, i.e. 1970); the
         # FabricDriftCheckStopped alert treats absence as stopped (deploy/prometheus/alerts.yml).
-        if scheduler.last_started:
+        # With no active switch there is nothing to check: not a stopped check (a new install or demo).
+        last = scheduler.last_started or (None if report else time.time())
+        if last:
             Gauge("fabric_drift_last_run_timestamp_seconds", "When the last drift job started",
-                  registry=registry).set(scheduler.last_started)
+                  registry=registry).set(last)
     return generate_latest(registry)

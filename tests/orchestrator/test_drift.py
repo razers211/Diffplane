@@ -1,6 +1,7 @@
 """Scheduled drift checks against a real PostgreSQL."""
 
 import asyncio
+import time
 
 import pytest
 from fastapi.testclient import TestClient
@@ -133,10 +134,20 @@ def test_last_run_is_absent_until_a_run_started():
     """An unset gauge would export 0 (1970) and fire FabricDriftCheckStopped at once."""
     from orchestrator.drift import SchedulerState
 
-    assert "fabric_drift_last_run_timestamp_seconds" not in metrics([], SchedulerState(interval=900)).decode()
-    started = metrics([], SchedulerState(interval=900, last_started=1_791_000_000.0)).decode()
+    leaf = [{"device": "leaf1", "site": "lab", "state": "unknown"}]
+    assert "fabric_drift_last_run_timestamp_seconds" not in metrics(leaf, SchedulerState(interval=900)).decode()
+    started = metrics(leaf, SchedulerState(interval=900, last_started=1_791_000_000.0)).decode()
     assert "fabric_drift_last_run_timestamp_seconds 1.791e+09" in started
     assert "fabric_drift_interval_seconds 900.0" in started
+
+
+def test_no_active_switch_is_not_a_stopped_check():
+    """A new install or the demo has no active switch: FabricDriftCheckStopped must stay quiet."""
+    from orchestrator.drift import SchedulerState
+
+    body = metrics([], SchedulerState(interval=900)).decode()
+    line = next(l for l in body.splitlines() if l.startswith("fabric_drift_last_run_timestamp_seconds "))
+    assert abs(float(line.split()[1]) - time.time()) < 60
 
 
 def test_http_drift_and_metrics(database_url, monkeypatch):
