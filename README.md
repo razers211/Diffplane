@@ -1,13 +1,73 @@
 # Diffplane
 
-Diffplane manages a leaf-spine data-centre fabric (BGP EVPN, VXLAN, M-LAG) from one web GUI.
-Operators describe what they want (segments, ports, services, routing); Diffplane generates
-each switch's configuration, shows the exact patch, and deploys it only after a person approves
-it, switch by switch, verifying each one.
+**An open-source, self-hosted controller for EVPN-VXLAN data-centre fabrics on Huawei CloudEngine
+switches.** Describe what you want in a web GUI; Diffplane writes every switch's configuration,
+shows you the exact patch, and deploys it only after a person approves it, one safe wave at a
+time, checking each switch before going on.
 
-It is compatible with Huawei CloudEngine data-centre switches running VRP V300 (see
-[supported switches](docs/supported-switches.md)). Diffplane is an independent project, not
-affiliated with or endorsed by Huawei.
+No commercial SDN controller, no licence fee, no cloud: a Docker Compose stack you run yourself,
+built on [NetBox](https://github.com/netbox-community/netbox) and
+[Annet](https://github.com/annetutil/annet).
+
+![Diffplane's overview: fabric health, the live topology and what needs attention](docs/images/overview.png)
+
+## Try it in one command
+
+```sh
+git clone https://github.com/razers211/Diffplane.git && cd Diffplane
+scripts/demo.sh
+```
+
+You need Docker with Compose v2 and Python 3. The script builds and starts the stack, loads two
+example fabrics and prints a sign-in. Open <https://127.0.0.1:8000/> (a self-signed certificate:
+the script prints its fingerprint). Nothing in the demo talks to a switch: every example switch
+is planned, and deploys are off.
+
+Then try the main loop: **Network › Segments**, create a segment and attach it to a leaf port;
+**Changes › Pending** shows the patch each switch would get. `scripts/demo.sh down` stops it,
+`scripts/demo.sh reset` deletes its data.
+
+## Why
+
+Running an EVPN fabric by hand means typing the same VXLAN, VPN-instance and BGP blocks on every
+switch, and keeping route targets, VNIs and addresses consistent across all of them. Diffplane
+keeps only the intent (this segment on these ports, routed through that firewall) and derives
+everything else, so the switches cannot disagree.
+
+- **Never a change without a diff.** Generate, diff, show the patch, approve, deploy in waves
+  that never touch both switches of an M-LAG pair, verify each switch, continue.
+- **Drift is visible.** Every 15 minutes each switch is compared with intent; a hand change shows
+  up as a diff.
+- **The fabric runs without it.** Diffplane only writes configuration; if it is down, the
+  network keeps forwarding.
+- **It stays out of your way.** The management interface, its VPN instance and the platform's
+  own accounts are never touched; hand-made routing objects are imported, not removed.
+
+## What it does
+
+- **Fabrics:** symmetric (distributed gateways) or centralized (a gateway pair); M-LAG leaf
+  pairs, OSPF underlay, iBGP EVPN with route-reflector spines. Build new ones on a map, or import
+  a running fabric.
+- **Intent:** segments and ports (picked on a drawn front panel), Eth-Trunks, firewall and ISP
+  services, routing (BGP peers, policies, prefix lists, static routes) in plain words or expert
+  view, IPv6, DHCP relay, microsegmentation, QoS, port protection.
+- **Safe change:** approvals with roles, pre-deploy checks, change windows with staged drafts,
+  intent rollback, config backups, an audit trail.
+- **Seeing the network:** live topology, traffic and capacity forecasts, health scores and a
+  timeline, control-plane state, optics, flows, syslog, a "why can't A reach B?" answer, and a
+  NOC wall view.
+- **Running it:** zero-touch provisioning, software upgrades, Active Directory and RADIUS
+  sign-in, alerting, high availability on two servers and a witness.
+
+What exists and what still needs more hardware to verify is in the [roadmap](ROADMAP.md).
+
+## Status
+
+Every generator has been deployed and removed on a real CloudEngine switch, ending with an
+empty diff (see [supported switches](docs/supported-switches.md)). Behaviour that needs several
+real switches together (M-LAG negotiation, EVPN between leaf pairs, traffic across the fabric)
+is not verified yet: the [roadmap](ROADMAP.md) lists it, and help with more hardware is welcome. Diffplane is an independent
+project, not affiliated with or endorsed by Huawei.
 
 > **Use at your own risk.** Diffplane changes production network configuration. Test it in a lab
 > first, bring real fabrics up diff-only, and read the [security model](docs/security-model.md).
@@ -21,29 +81,8 @@ GUI ─► orchestrator (FastAPI) ─► NetBox (source of truth)
 switches ─► collector (NETCONF, read-only) ─► Prometheus ─► topology, health, drift
 ```
 
-- **Never deploy without a diff**: generate, diff, show the patch, approve, deploy in pair-safe
-  waves, verify each switch, continue.
-- **Store intent, derive the rest**: addresses, route targets, VNIs and numbering are computed.
-- **Pinned host keys**, deploys off by default, and the management plane is never touched.
-
-More: [architecture](docs/architecture.md), [concepts](docs/concepts.md).
-
-## Quick start
-
-```sh
-cd deploy
-python3 gen_env.py                     # deploy/.env with random secrets
-docker compose up --build -d
-docker compose logs orchestrator | grep SETUP     # one-time code for the first admin
-```
-
-Open <https://127.0.0.1:8000/>, create the first admin, then load the synthetic example fabric:
-
-```sh
-docker compose exec orchestrator python -m seed seed/fabrics/example.yaml
-```
-
-The full walk-through is in [docs/quickstart.md](docs/quickstart.md).
+More: [architecture](docs/architecture.md), [concepts](docs/concepts.md). To run it for real
+(your own admin, then a lab switch), follow the [quick start](docs/quickstart.md).
 
 ## Documentation
 

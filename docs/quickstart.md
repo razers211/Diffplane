@@ -1,5 +1,8 @@
 # Quick start
 
+Just looking? `scripts/demo.sh` from the repository root does all of this in one command
+(secrets, start, two example fabrics, an admin account) and prints how to sign in.
+
 This brings up Diffplane on one machine with the synthetic example fabric. Nothing in it
 talks to a switch: every device of the example fabric is *planned* (modelled only).
 
