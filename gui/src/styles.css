@@ -33,7 +33,7 @@
   --bad-soft: #f5dcd7;
   --warn: #924600;
   --warn-soft: #f5e4cc;
-  --s1: #2f6fd0; --s2: #e0701d; --s3: #2f9a4c; --s4: #8a5a2b; --s5: #d0352b; --s6: #7b4fc9;   /* segments: cable jacket colours */
+  --s1: #2f6fd0; --s2: #c2378a; --s3: #d8d020; --s4: #7a4bc4; --s5: #d0352b; --s6: #ff6f91;   /* segments: cable jacket colours, none of the --p-* hues the front panel's legend uses */
   --p-segment: #19b5a8;       /* the drawn front panel: what a port carries, on a black cage */
   --p-service: #e8932a;
   --p-trunk: #7d9cf0;
@@ -93,7 +93,7 @@
     --bad-soft: #3a1814;
     --warn: #f0a54a;
     --warn-soft: #33250f;
-    --s1: #5b8fe6; --s2: #ef8a3c; --s3: #4fb86a; --s4: #b07d4a; --s5: #ec6155; --s6: #9c7ae0;
+    --s1: #5b8fe6; --s2: #e0569f; --s3: #e6dc4a; --s4: #9c7ae0; --s5: #ec6155; --s6: #ff8fab;
     --chassis: #24251f;
     --chassis-edge: #4a4b43;
     --cage: #0a0a09;
@@ -136,7 +136,7 @@
   --bad-soft: #3a1814;
   --warn: #f0a54a;
   --warn-soft: #33250f;
-  --s1: #5b8fe6; --s2: #ef8a3c; --s3: #4fb86a; --s4: #b07d4a; --s5: #ec6155; --s6: #9c7ae0;
+  --s1: #5b8fe6; --s2: #e0569f; --s3: #e6dc4a; --s4: #9c7ae0; --s5: #ec6155; --s6: #ff8fab;
   --chassis: #24251f;
   --chassis-edge: #4a4b43;
   --cage: #0a0a09;
@@ -847,7 +847,7 @@ dl.settings dd { margin: 0; }
 .fp-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--muted); }
 .fp-legend span { display: inline-flex; align-items: center; gap: 6px; }
 .fp-legend i { width: 12px; height: 9px; border-radius: 2px; display: inline-block; }
-.fp-legend .k-segment { background: var(--p-segment); } .fp-legend .k-service { background: var(--p-service); }
+.fp-legend .k-segment { background: var(--p-segment); } .fp-legend .k-segment.painted { background: linear-gradient(90deg, var(--s1) 0 34%, var(--s2) 34% 67%, var(--s3) 67%); } .fp-legend .k-service { background: var(--p-service); }
 .fp-legend .k-trunk { background: var(--p-trunk); } .fp-legend .k-fabric { background: var(--p-fabric); }
 .fp-legend .k-peer { background: repeating-linear-gradient(45deg, var(--unused) 0 2px, transparent 2px 4px); }
 .fp-legend .k-free { background: var(--cage); border: 1px solid var(--cage-edge); }

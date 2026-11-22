@@ -91,7 +91,8 @@ export function Faceplate({ device, pick, refresh = 0, optics, drop, paint, zone
       </div>
       {legend && <div className="fp-legend">
         {(["segment", "service", "trunk", "peer", "fabric", "free"] as PortKind[]).map((k) => (
-          <span key={k}><i className={`k-${k}`} />{KIND_LABEL[k]}</span>
+          // Painted by segment (the Ports page): its swatch shows segment colours, not the plain one.
+          <span key={k}><i className={`k-${k}${paint && k === "segment" ? " painted" : ""}`} />{KIND_LABEL[k]}{paint && k === "segment" ? ", in its segment's colour" : ""}</span>
         ))}
         <span><i className="led-key" />link up</span>
       </div>}
