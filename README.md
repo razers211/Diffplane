@@ -9,7 +9,7 @@ No commercial SDN controller, no licence fee, no cloud: a Docker Compose stack y
 built on [NetBox](https://github.com/netbox-community/netbox) and
 [Annet](https://github.com/annetutil/annet).
 
-![Diffplane's overview: fabric health, the live topology and what needs attention](docs/images/overview.png)
+![Dragging segments onto a leaf's ports, then the configuration Diffplane generates for it](docs/images/demo.gif)
 
 ## Try it in one command
 
