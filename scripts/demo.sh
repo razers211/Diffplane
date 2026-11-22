@@ -42,10 +42,10 @@ echo
 # NetBox is slow for a while after its first start: retry instead of failing the demo.
 for fabric in example example-central; do
   tries=0
-  until dc exec -T orchestrator python -m seed "seed/fabrics/$fabric.yaml" >/dev/null; do
+  until out=$(dc exec -T orchestrator python -m seed "seed/fabrics/$fabric.yaml" 2>&1); do
     tries=$((tries + 1))
-    if [ "$tries" -ge 10 ]; then echo "could not load $fabric" >&2; exit 1; fi
-    echo "NetBox is still starting; retrying in 20 s"; sleep 20
+    if [ "$tries" -ge 10 ]; then echo "could not load $fabric:" >&2; echo "$out" | tail -5 >&2; exit 1; fi
+    echo "NetBox is still warming up; trying again in 20 s"; sleep 20
   done
 done
 
