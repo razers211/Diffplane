@@ -48,7 +48,7 @@ export function Services({
   const canOperate = useCan("operator");
   const devices = useFetch(() => fetchDevices(site), [site]);
   const arch = useFetch(() => fetchArchitecture(site), [site]);
-  const leaves = serviceLeaves(devices.data ?? [], arch.data?.architecture === "centralized");
+  const leaves = serviceLeaves(devices.data ?? [], arch.data?.gateway_pair ?? null);
   const [form, setForm] = useState<Service>(EMPTY);
   const [vlan, setVlan] = useState("");
   const [asn, setAsn] = useState("");
@@ -247,7 +247,7 @@ export function Services({
           Name <input value={form.name} onChange={set("name")} placeholder={form.kind === "isp" ? "ISP-A" : "FW"} />
         </label>
         <label>
-          Leaf
+          Switch
           <select value={form.device} onChange={set("device")}>
             <option value="">choose…</option>
             {leaves.map((d) => (

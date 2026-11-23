@@ -12,8 +12,10 @@ export function attachableLeaves<T extends Placed>(devices: T[], centralized: bo
   return devices.filter((d) => d.role === "leaf" || (centralized && d.role === "border-leaf"));
 }
 
-/** Leaves a new firewall or ISP service may sit on. */
-export function serviceLeaves<T extends Placed>(devices: T[], centralized: boolean): T[] {
+/** Switches a new firewall or ISP service may sit on. A centralized fabric's services sit on its
+ * gateway pair only, spines or border leaves (`gatewayPair`, as the orchestrator requires). */
+export function serviceLeaves<T extends Placed>(devices: T[], gatewayPair: string[] | null): T[] {
+  if (gatewayPair) return devices.filter((d) => gatewayPair.includes(d.name));
   const borders = devices.filter((d) => d.role === "border-leaf");
-  return !centralized && borders.length > 0 ? borders : devices.filter(isLeaf);
+  return borders.length > 0 ? borders : devices.filter(isLeaf);
 }
