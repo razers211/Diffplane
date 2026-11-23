@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { fetchRemoval, fetchTopology, removeDevice, type BuildOptions } from "./api";
 import { useCan } from "./role";
-import { GENERIC, type Kind, type LinkDraft, type SwitchDraft } from "./buildForm";
+import { GENERIC, staggered, type Kind, type LinkDraft, type SwitchDraft } from "./buildForm";
 import { useFetch } from "./useFetch";
 import { draggable, dropZone, installDragDrop, useDrops } from "./dragdrop";
 
@@ -80,6 +80,7 @@ export function BuildMap({ site, opts, drafts, links, model, onModel, onAdd, onL
   const p = (x: number, y: number, z: number) => [ox + (x - y) * C * scale, oy + (x + y) * S * scale - z * scale];
   const grid = (b: Box) => [b.c + b.r, b.r - b.c];
   const top = (b: Box) => { const [x, y] = grid(b); return p(x + W / 2, y + D / 2, H); };
+  const low = staggered(boxes.map((b) => { const [x, y] = grid(b); return { name: b.name, x: p(x + W, y + D, 0)[0], row: b.spine ? 0 : 1 }; }));
   
   const old = (topology.data?.links ?? [])
     .map((l) => [l.ends[0]?.device, l.ends[1]?.device])
@@ -165,9 +166,9 @@ export function BuildMap({ site, opts, drafts, links, model, onModel, onAdd, onL
                     <rect className="st" x={cx - bw / 2} y={cy - bh / 2} width={3.5} height={bh} rx={1.5} />
                   </>);
                 })()}
-                <text x={p(x + W, y + D, 0)[0]} y={p(x + W, y + D, 0)[1] + 14} textAnchor="middle">{b.name}</text>
-                {generic.has(b.name) && <text className="bm-serial" x={p(x + W, y + D, 0)[0]} y={p(x + W, y + D, 0)[1] + 26} textAnchor="middle">detect its ports</text>}
-                {stocked.get(b.name) && <text className="bm-serial" x={p(x + W, y + D, 0)[0]} y={p(x + W, y + D, 0)[1] + 26} textAnchor="middle">{stocked.get(b.name)}</text>}
+                <text x={p(x + W, y + D, 0)[0]} y={p(x + W, y + D, 0)[1] + 14 + (low.has(b.name) ? 12 : 0)} textAnchor="middle">{b.name}</text>
+                {generic.has(b.name) && <text className="bm-serial" x={p(x + W, y + D, 0)[0]} y={p(x + W, y + D, 0)[1] + 26 + (low.has(b.name) ? 12 : 0)} textAnchor="middle">detect its ports</text>}
+                {stocked.get(b.name) && <text className="bm-serial" x={p(x + W, y + D, 0)[0]} y={p(x + W, y + D, 0)[1] + 26 + (low.has(b.name) ? 12 : 0)} textAnchor="middle">{stocked.get(b.name)}</text>}
               </g>
             );
           })}

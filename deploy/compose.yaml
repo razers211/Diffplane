@@ -381,6 +381,11 @@ services:
       - orchestrator-tls-public:/tls-public:ro   # to verify the orchestrator's certificate
       - prometheus-data:/prometheus
     secrets: [metrics_token]   # /run/secrets/metrics_token, sent with each scrape of /metrics
+    depends_on:
+      # Its certificate must exist first: Prometheus does not retry a scrape pool it could not
+      # create, so on a fresh install the orchestrator was never scraped (and the drift alert fired).
+      orchestrator:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:9090/-/ready"]
       start_period: 10s

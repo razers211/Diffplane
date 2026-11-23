@@ -269,3 +269,19 @@ export function placeDetected(drafts: SwitchDraft[], name: string, address: stri
     };
   });
 }
+
+/** The names whose labels drop one line on a map so that no two in a row overlap (x: a label's centre,
+ *  label: the text drawn when not the name, charWidth: one character of the map's monospace labels). */
+export function staggered(labels: { name: string; label?: string; x: number; row: number }[], charWidth = 6.4): Set<string> {
+  const low = new Set<string>();
+  const ends = new Map<number, [number, number]>();   // per row: where the last label on each line ends
+  for (const l of [...labels].sort((a, b) => a.x - b.x)) {
+    const half = ((l.label ?? l.name).length * charWidth) / 2 + 3;
+    const end = ends.get(l.row) ?? [-Infinity, -Infinity];
+    const line = l.x - half >= end[0] ? 0 : 1;
+    if (line) low.add(l.name);
+    end[line] = l.x + half;
+    ends.set(l.row, end);
+  }
+  return low;
+}

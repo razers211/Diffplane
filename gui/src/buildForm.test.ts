@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { BuildOptions } from "./api";
 import {
-  autoLinks, batchProblem, cableOn, canBeGateway, emptySwitch, inventoryChoices, leafChoices, peerLinkChoices, GENERIC, linksForDetected, placeDetected, portChoices, spineChoices, toBatch, unpairedSpines, withDetected, type LinkDraft, type SwitchDraft, nextNames } from "./buildForm";
+  autoLinks, batchProblem, cableOn, canBeGateway, emptySwitch, inventoryChoices, leafChoices, peerLinkChoices, GENERIC, linksForDetected, placeDetected, portChoices, spineChoices, toBatch, unpairedSpines, withDetected, type LinkDraft, type SwitchDraft, nextNames, staggered } from "./buildForm";
 
 const MODEL = "CE6881H-48S6CQ";
 const opts: BuildOptions = {
@@ -177,5 +177,18 @@ describe("detected switches", () => {
     expect(cabled).toEqual([link("spine1", "100GE1/0/3", "leaf9", "100GE1/0/1")]);
     expect(batchProblem(found, placed, cabled)).toBeNull();
     expect(linksForDetected(found, placed, placed, cabled, "leaf9")).toBe(cabled);   // a model already: unchanged
+  });
+});
+
+describe("staggered", () => {
+  it("drops a label that would run into its neighbour's, row by row", () => {
+    const at = (name: string, x: number, row = 1) => ({ name, x, row });
+    // 13 characters are about 89 units wide: 80 apart they overlap, 120 apart they do not.
+    expect(staggered([at("example-leaf1", 0), at("example-leaf2", 80), at("example-leaf3", 160)])).toEqual(new Set(["example-leaf2"]));
+    expect(staggered([at("example-leaf1", 0), at("example-leaf2", 120)])).toEqual(new Set());
+    expect(staggered([at("leaf1", 0), at("leaf2", 80)])).toEqual(new Set());
+    expect(staggered([at("example-spine1", 0, 0), at("example-leaf1", 10, 1)])).toEqual(new Set());
+    // What is measured is the label drawn: a shortened name fits.
+    expect(staggered([{ ...at("example-leaf1", 0), label: "leaf1" }, { ...at("example-leaf2", 80), label: "leaf2" }])).toEqual(new Set());
   });
 });

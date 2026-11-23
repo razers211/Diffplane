@@ -95,9 +95,12 @@ export function pairs(names: string[], links: TopologyLink[]): string[][] {
 // Horizontal room for a pair of leaves, and the gap between its two boxes: wide enough that
 // two names of about 11 characters (east-leaf10) never touch (44 was too tight).
 const SLOT = 150;
-/** The name under a box: a name too long for PAIR_GAP loses its fabric's prefix (the band names the fabric). */
-export const mapLabel = (node: { name: string; site?: string | null }) =>
-  node.name.length > 11 && node.site && node.name.startsWith(`${node.site}-`) ? node.name.slice(node.site.length + 1) : node.name;
+/** The name under a box: a name too long for PAIR_GAP loses its fabric's prefix (the band names the fabric),
+ *  unless another switch on the map is already called that. */
+export const mapLabel = (node: { name: string; site?: string | null }, names: ReadonlySet<string> = new Set()) => {
+  const short = node.site && node.name.startsWith(`${node.site}-`) ? node.name.slice(node.site.length + 1) : node.name;
+  return node.name.length > 11 && !names.has(short) ? short : node.name;
+};
 const PAIR_GAP = 70;
 const BAND = 330; // height of one fabric's band
 const OTHER_ROW = 80;

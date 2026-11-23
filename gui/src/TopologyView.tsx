@@ -4,6 +4,7 @@ import { LEVEL_PILL } from "./Health";
 import { bundleLoad, flowSeconds, layout, mapLabel, problemCount, type Bundle, type PlacedNode } from "./topology";
 import { formatBps } from "./units";
 import { useFetch } from "./useFetch";
+import { staggered } from "./buildForm";
 
 // The fabric map: switch boxes with a status stripe on pair floors. Plain SVG. It is a panel of the
 // overview (layout A): details open beside the map when something is clicked.
@@ -42,6 +43,9 @@ export function TopologyView({ site, deploy, title = "Fabric", path, stop }:
   const rates: FabricTraffic | null = view === "traffic" ? traffic.data?.interfaces ?? {} : null;
 
   const map = data ? layout(data, arch.data?.gateway_pair ?? null) : null;
+  const names = new Set(map?.nodes.map((n) => n.node.name));
+  // Long names in a pair would touch: drop every other one a line (10 px monospace, about 6 units a character).
+  const low = staggered((map?.nodes ?? []).map((n) => ({ name: n.name, label: mapLabel(n.node, names), x: n.x, row: n.y })), 6.1);
   const problems = data ? problemCount(data) : 0;
   const node = selected?.kind === "node" ? map?.nodes.find((n) => n.name === selected.name) : undefined;
   const bundle = selected?.kind === "bundle" ? map?.bundles.find((b) => b.id === selected.id) : undefined;
@@ -116,6 +120,8 @@ export function TopologyView({ site, deploy, title = "Fabric", path, stop }:
                 <SwitchBox
                   key={n.name}
                   placed={n}
+                  names={names}
+                  lowered={low.has(n.name)}
                   mark={deploy?.[n.node.name]}
                   health={scores[n.node.name]}
                   selected={selected?.kind === "node" && selected.name === n.name}
@@ -185,13 +191,13 @@ function BundleLine({ bundle, rates, nodes, selected, onSelect }: { bundle: Bund
   );
 }
 
-function SwitchBox({ placed, selected, onSelect, mark, health }: { placed: PlacedNode; selected: boolean; onSelect: () => void; mark?: DeployStep["status"]; health?: Scored }) {
+function SwitchBox({ placed, names, lowered, selected, onSelect, mark, health }: { placed: PlacedNode; names: ReadonlySet<string>; lowered: boolean; selected: boolean; onSelect: () => void; mark?: DeployStep["status"]; health?: Scored }) {
   const { x, y, kind, node } = placed;
   const spine = kind === "spine";
   const w = spine ? 30 : 22, depth = spine ? 13 : 11;
   const ports = spine ? 5 : 4;
   const state = !node.in_netbox ? "unknown" : node.status !== "active" ? "planned" : node.collected ? "polled" : "silent";
-  const label = mapLabel(node);
+  const label = mapLabel(node, names);
   return (
     <g
       className={`dev ${state}${selected ? " selected" : ""}${mark ? ` dep dep-${mark}` : ""}`}
@@ -220,7 +226,7 @@ function SwitchBox({ placed, selected, onSelect, mark, health }: { placed: Place
           <text x={x - w + 3} y={y - depth + 6} textAnchor="middle">{health.score}</text>
         </g>
       )}
-      <text className="dev-label" x={x} y={spine ? y - depth - 8 : y + depth + 13} textAnchor="middle">
+      <text className="dev-label" x={x} y={spine ? y - depth - 8 - (lowered ? 11 : 0) : y + depth + 13 + (lowered ? 11 : 0)} textAnchor="middle">
         {label}
       </text>
     </g>

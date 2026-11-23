@@ -61,6 +61,8 @@ everything else, so the switches cannot disagree.
 - **Running it:** zero-touch provisioning, software upgrades, Active Directory and RADIUS
   sign-in, alerting, high availability on two servers and a witness.
 
+![Two leaf pairs and a spine dragged onto the fabric map, each cabled to the rest by itself, then added: the overview shows the bigger fabric](docs/images/build.gif)
+
 What exists and what still needs more hardware to verify is in the [roadmap](ROADMAP.md).
 
 ## Status

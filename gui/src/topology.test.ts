@@ -121,5 +121,7 @@ describe("mapLabel", () => {
     expect(mapLabel({ name: "lab-ensp-leaf1", site: "lab-ensp" })).toBe("leaf1");
     expect(mapLabel({ name: "east-leaf10", site: "east" })).toBe("east-leaf10");
     expect(mapLabel({ name: "border-leaf-long1", site: "lab" })).toBe("border-leaf-long1");
+    // Two boxes called spine1 would be ambiguous: keep the prefix where the short name is taken.
+    expect(mapLabel({ name: "example-spine1", site: "example" }, new Set(["spine1", "example-spine1"]))).toBe("example-spine1");
   });
 });

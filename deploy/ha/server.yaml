@@ -162,6 +162,7 @@ services:
     volumes:
       - ./ha/out/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ./ha/tls-public:/tls-public:ro
+    depends_on: !reset {}   # the certificate is copied in at install; the orchestrator runs on the active server only
 
   alertmanager-init:
     # The volume is first mounted here on a server whose orchestrator never ran, so it is root's;
