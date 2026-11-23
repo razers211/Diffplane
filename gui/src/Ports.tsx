@@ -16,6 +16,8 @@ import { parseVid, vidLabel } from "./vid";
 
 // Network › Ports: segments dragged onto a switch's front panel or its
 // trunks, free ports clicked together into a new Eth-Trunk. A pair's two switches side by side.
+// Every switch is offered: spines and border leaves take trunks and port
+// settings here too; segments are dropped only where they may go (`attachableLeaves`).
 // Every write is ordinary intent (the pending bar follows); nothing reaches a switch before a deploy.
 
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
@@ -35,8 +37,8 @@ function Board({ site }: { site: string }) {
   const devices = useFetch(() => fetchDevices(site), [site]);
   const arch = useFetch(() => fetchArchitecture(site), [site]);
   const segs = useFetch(() => fetchSegments(site), [site, version]);
-  const leaves = attachableLeaves(devices.data ?? [], arch.data?.architecture === "centralized")
-    .sort((a, b) => a.name.localeCompare(b.name));
+  const leaves = [...(devices.data ?? [])].sort((a, b) => a.name.localeCompare(b.name));
+  const carries = new Set(attachableLeaves(devices.data ?? [], arch.data?.architecture === "centralized").map((d) => d.name));
   const [chosen, setChosen] = useState("");
   const device = leaves.some((l) => l.name === chosen) ? chosen : leaves[0]?.name ?? "";
   const peer = (devices.data ?? []).find((d) => d.name === device)?.peer ?? null;
@@ -50,7 +52,7 @@ function Board({ site }: { site: string }) {
 
   if (devices.error) return <p className="error">{devices.error}</p>;
   if (!devices.data) return <p className="muted">Loading…</p>;
-  if (leaves.length === 0) return <p className="muted">No switch of {site} can carry segments.</p>;
+  if (leaves.length === 0) return <p className="muted">{site} has no switch yet.</p>;
 
   return (
     <div className="ports-board">
@@ -82,7 +84,7 @@ function Board({ site }: { site: string }) {
       </div>
 
       {shown.map((d) => (
-        <SwitchPorts key={d} site={site} device={d} segments={segments} version={version} onSaved={onSaved} />
+        <SwitchPorts key={d} site={site} device={d} segments={carries.has(d) ? segments : null} version={version} onSaved={onSaved} />
       ))}
 
       {ask && <AttachAsk ask={ask} site={site} segments={segments} onClose={() => setAsk(null)} onSaved={onSaved} />}
@@ -97,11 +99,13 @@ function Board({ site }: { site: string }) {
   );
 }
 
-function SwitchPorts({ site, device, segments, version, onSaved }: {
-  site: string; device: string; segments: Segment[]; version: number; onSaved: (text: string) => void;
+function SwitchPorts({ site, device, segments: carried, version, onSaved }: {
+  site: string; device: string; segments: Segment[] | null; version: number; onSaved: (text: string) => void;
 }) {
   const canOperate = useCan("operator");
-  const ports = useFetch(() => fetchPorts(device), [device, version]);
+  // null: this switch carries no segments (a spine, a symmetric fabric's border leaf): trunks and port settings only.
+  const segments = carried ?? [];
+  const ports = useFetch(() => (carried ? fetchPorts(device) : Promise.resolve([])), [device, version, !!carried]);
   const trunks = useFetch(() => fetchTrunks(device), [device, version]);
   const [bundle, setBundle] = useState<string[]>([]);
   const [inspect, setInspect] = useState<string | null>(null);
@@ -135,7 +139,7 @@ function SwitchPorts({ site, device, segments, version, onSaved }: {
 
   return (
     <section className="panel switch-ports">
-      <header><h2>{device}</h2><span className="hint">Click free ports to bundle them; click a used port to see it</span></header>
+      <header><h2>{device}</h2><span className="hint">Click free ports to bundle them; click a used port to see it{carried ? "" : " · carries no segments"}</span></header>
       <div className="pad">
         <Faceplate
           device={device}
@@ -144,7 +148,8 @@ function SwitchPorts({ site, device, segments, version, onSaved }: {
           paint={(p) => (p.kind === "segment" && p.segments[0] && colourOf(segments, p.segments[0].vni) ? `var(--s${colourOf(segments, p.segments[0].vni)})` : undefined)}
           pick={{
             selected: [...bundle, ...(inspect ? [inspect] : [])],
-            refuse: (p) => (allowed.has(trunkOrPort(p)) ? null : refusal(p, allowed)),
+            // Any port but a fabric link or the peer-link: free ones bundle, the others show their segments and settings.
+            refuse: (p) => (p.kind === "fabric" || p.kind === "peer" ? refusal(p, allowed) : null),
             target: trunkOrPort,
             onToggle: (t, p) => {
               if (p.kind === "free" && canOperate && data?.free_ports.includes(t)) {
@@ -187,7 +192,7 @@ function SwitchPorts({ site, device, segments, version, onSaved }: {
         {inspect && (
           <div className="port-inspect">
             <h3>{inspect}{inspected?.mlag ? " · M-LAG trunk, both leaves" : ""}</h3>
-            {!inspected?.segments.length && <p className="muted small">No segment here.{canOperate && allowed.has(inspect) ? " Drag one onto it." : ""}</p>}
+            {carried && !inspected?.segments.length && <p className="muted small">No segment here.{canOperate && allowed.has(inspect) ? " Drag one onto it." : ""}</p>}
             {inspected?.segments.map((s) => (
               <div key={s.vni} className="inspect-row">
                 <span className={`seg-dot s${colourOf(segments, s.vni)}`} />{name(s.vni)}<span className="muted">{vidLabel(s.vid)}</span>
