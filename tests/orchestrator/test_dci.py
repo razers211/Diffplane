@@ -46,7 +46,8 @@ def test_a_link_derives_each_sides_asn_loopbacks_and_vtep():
 @pytest.mark.parametrize("change, reason", [
     ({"1_fabric": "example"}, "two different fabrics"),
     ({"0_pair": ["leaf1", "spine1"]}, "not an M-LAG pair"),
-    ({"0_pair": ["leaf1"]}, "two switches"),
+    ({"0_pair": ["leaf1"]}, "both switches"),
+    ({"0_pair": ["leaf1", ""]}, "both switches of the border pair"),
     ({"0_uplinks": {"leaf1": [{"port": "100GE1/0/1", "address": "10.255.10.1/30", "neighbour": "10.255.10.2", "asn": 65004}]}},
      "already has an address"),
     ({"0_uplinks": {"leaf1": [{"port": "10GE1/0/1", "address": "10.255.10.1/30", "neighbour": "10.255.10.2", "asn": 65004}]}},

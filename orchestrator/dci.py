@@ -114,7 +114,9 @@ async def _side(nb, side: dict) -> dict:
     fabric = side.get("fabric")
     settings = await _fabric(nb, fabric)
     pair = list(side.get("pair") or ())
-    if len(pair) != 2 or pair[0] == pair[1]:
+    if len(pair) != 2 or not all(pair):
+        raise SegmentError(f"{fabric}: choose both switches of the border pair (an M-LAG pair)")
+    if pair[0] == pair[1]:
         raise SegmentError(f"{fabric}: a border is an M-LAG pair: two switches")
     devices = {}
     for name in pair:

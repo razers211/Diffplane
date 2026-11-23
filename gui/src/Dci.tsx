@@ -25,7 +25,7 @@ function sideForm(side?: DciSide, fabric = ""): SideForm {
 
 function SideFields({ label, form, onChange, fabrics, devices }: {
   label: string; form: SideForm; onChange: (f: SideForm) => void; fabrics: string[];
-  devices: { name: string; site: string | null; role: string | null }[];
+  devices: { name: string; site: string | null; role: string | null; peer?: string | null }[];
 }) {
   const choices = devices.filter((d) => d.site === form.fabric).map((d) => d.name).sort();
   const row = (sw: string) => form.rows[sw] ?? blankRow;
@@ -42,7 +42,11 @@ function SideFields({ label, form, onChange, fabrics, devices }: {
         </label>
         {(["a", "b"] as const).map((k) => (
           <label key={k}>{k === "a" ? "Border switch" : "Its M-LAG peer"}
-            <select value={form[k]} disabled={!form.fabric} onChange={(ev) => onChange({ ...form, [k]: ev.target.value })}>
+            <select value={form[k]} disabled={!form.fabric} onChange={(ev) => {
+              // the border switch brings its M-LAG peer along (still changeable)
+              const peer = k === "a" ? devices.find((d) => d.name === ev.target.value)?.peer : null;
+              onChange({ ...form, [k]: ev.target.value, ...(peer ? { b: peer } : {}) });
+            }}>
               <option value="">a switch…</option>
               {choices.map((n) => <option key={n} value={n}>{n}</option>)}
             </select>
