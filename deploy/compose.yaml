@@ -135,7 +135,7 @@ services:
       - redis-data:/data
 
   orchestrator:
-    image: ghcr.io/razers211/diffplane-orchestrator:${DIFFPLANE_VERSION:-v0.1.3}
+    image: ghcr.io/razers211/diffplane-orchestrator:${DIFFPLANE_VERSION:-v0.1.4}
     build: &app-build
       context: ..
       dockerfile: orchestrator/Dockerfile
@@ -222,7 +222,7 @@ services:
 
   # Read-only state collection (NETCONF <get> only). Same image as the orchestrator.
   collector:
-    image: ghcr.io/razers211/diffplane-orchestrator:${DIFFPLANE_VERSION:-v0.1.3}
+    image: ghcr.io/razers211/diffplane-orchestrator:${DIFFPLANE_VERSION:-v0.1.4}
     build: *app-build
     # Hardened: no capabilities (so no privilege gain), a read-only root filesystem (writes go to
     # /tmp and the named volumes).
@@ -273,7 +273,7 @@ services:
     restart: unless-stopped
 
   flows:
-    image: ghcr.io/razers211/diffplane-orchestrator:${DIFFPLANE_VERSION:-v0.1.3}
+    image: ghcr.io/razers211/diffplane-orchestrator:${DIFFPLANE_VERSION:-v0.1.4}
     build: *app-build
     # Hardened: no capabilities (so no privilege gain), a read-only root filesystem (writes go to
     # /tmp and the named volumes).
@@ -303,7 +303,7 @@ services:
 
   # Syslog from the switches: only messages of known switches, into ClickHouse for 90 days.
   syslog:
-    image: ghcr.io/razers211/diffplane-orchestrator:${DIFFPLANE_VERSION:-v0.1.3}
+    image: ghcr.io/razers211/diffplane-orchestrator:${DIFFPLANE_VERSION:-v0.1.4}
     build: *app-build
     # Hardened: no capabilities (so no privilege gain), a read-only root filesystem (writes go to
     # /tmp and the named volumes).
@@ -333,7 +333,7 @@ services:
   # (_management_vpn_) with a one-time account. Set SFTP_BIND to this host's address the switches
   # reach (the platform address in Settings) and SFTP_PORT to its port. Localhost by default.
   sftpd:
-    image: ghcr.io/razers211/diffplane-orchestrator:${DIFFPLANE_VERSION:-v0.1.3}
+    image: ghcr.io/razers211/diffplane-orchestrator:${DIFFPLANE_VERSION:-v0.1.4}
     build: *app-build
     # Hardened: no capabilities (so no privilege gain), a read-only root filesystem (writes go to
     # /tmp and the named volumes).
@@ -359,7 +359,7 @@ services:
   ztp:
     build:
       context: ./ztp
-    image: ghcr.io/razers211/diffplane-ztp:${DIFFPLANE_VERSION:-v0.1.3}
+    image: ghcr.io/razers211/diffplane-ztp:${DIFFPLANE_VERSION:-v0.1.4}
     profiles: ["ztp"]
     network_mode: host
     cap_add: [NET_ADMIN]

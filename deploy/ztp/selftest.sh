@@ -5,8 +5,8 @@
 # gets no lease, and that a host with no registration can read nothing, not even by path.
 # Run from deploy/ after `docker compose build orchestrator ztp`:  sh ztp/selftest.sh
 set -eu
-ORCH="ghcr.io/razers211/diffplane-orchestrator:${DIFFPLANE_VERSION:-v0.1.3}"
-ZTPIMG="ghcr.io/razers211/diffplane-ztp:${DIFFPLANE_VERSION:-v0.1.3}"
+ORCH="ghcr.io/razers211/diffplane-orchestrator:${DIFFPLANE_VERSION:-v0.1.4}"
+ZTPIMG="ghcr.io/razers211/diffplane-ztp:${DIFFPLANE_VERSION:-v0.1.4}"
 NET=ztp-selftest
 VOL=ztp-selftest
 KNOWN=02:00:00:00:00:01
