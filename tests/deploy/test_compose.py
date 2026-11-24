@@ -285,7 +285,7 @@ def test_every_image_is_pinned_by_digest():
         if "node_modules" in path.parts:
             continue
         for line in path.read_text().splitlines():
-            if m := re.match(r"\s*(?:image:|FROM)\s+(\S+)", line):
+            if m := re.match(r"\s*(?:image:|FROM)\s+(?:--\S+\s+)*(\S+)", line):
                 refs.append((path.name, m.group(1)))
     unpinned = [r for r in refs if not r[1].endswith(":local") and "@sha256:" not in r[1]]
     assert refs and unpinned == []

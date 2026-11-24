@@ -3,11 +3,13 @@ version: 2
 # platform pins on purpose are planned upgrades, never automatic: Python and the Annet stack (the
 # rulebook depends on their exact versions), Node and TypeScript (the GUI build), ClickHouse (the
 # flows data), Alpine for keepalived (the VIP's iptables behaviour was proven on 3.20).
+# A new version waits 7 days (cooldown) before Dependabot proposes it.
 # Security updates are separate: Settings > Code security > Dependabot security updates.
 updates:
   - package-ecosystem: pip
     directory: /
     schedule: {interval: weekly}
+    cooldown: {default-days: 7}
     open-pull-requests-limit: 5
     groups:
       python: {patterns: ["*"]}
@@ -19,6 +21,7 @@ updates:
   - package-ecosystem: npm
     directory: /gui
     schedule: {interval: weekly}
+    cooldown: {default-days: 7}
     open-pull-requests-limit: 5
     groups:
       gui: {patterns: ["*"]}
@@ -28,12 +31,14 @@ updates:
   - package-ecosystem: github-actions
     directory: /
     schedule: {interval: weekly}
+    cooldown: {default-days: 7}
     groups:
       actions: {patterns: ["*"]}
   # Docker image tags and digests: Dockerfiles and Compose files.
   - package-ecosystem: docker
     directories: [/orchestrator, /deploy/ztp, /deploy/ha/patroni, /deploy/ha/keepalived]
     schedule: {interval: weekly}
+    cooldown: {default-days: 7}
     groups:
       images: {patterns: ["*"]}
     ignore:
@@ -46,6 +51,7 @@ updates:
   - package-ecosystem: docker-compose
     directories: [/deploy, /deploy/ha]
     schedule: {interval: weekly}
+    cooldown: {default-days: 7}
     groups:
       compose: {patterns: ["*"]}
     ignore:
