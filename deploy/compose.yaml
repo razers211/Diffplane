@@ -1,5 +1,8 @@
 # Local environment. Run from this directory:
-#   python3 gen_env.py && docker compose up --build
+#   python3 gen_env.py && docker compose up -d
+# The orchestrator and ZTP images are the signed release images from ghcr.io (DIFFPLANE_VERSION,
+# default the release below; each release moves it). `up --build` builds them from this checkout
+# instead: needed on a commit after that release, or after changing API or GUI code.
 # NetBox publishes no ports: only the orchestrator talks to it, over the Compose network.
 name: diffplane
 
@@ -131,7 +134,7 @@ services:
       - redis-data:/data
 
   orchestrator:
-    image: diffplane-orchestrator:local
+    image: ghcr.io/razers211/diffplane-orchestrator:${DIFFPLANE_VERSION:-v0.1.3}
     build: &app-build
       context: ..
       dockerfile: orchestrator/Dockerfile
@@ -223,7 +226,7 @@ services:
 
   # Read-only state collection (NETCONF <get> only). Same image as the orchestrator.
   collector:
-    image: diffplane-orchestrator:local
+    image: ghcr.io/razers211/diffplane-orchestrator:${DIFFPLANE_VERSION:-v0.1.3}
     build: *app-build
     # Hardened: no capabilities (so no privilege gain), a read-only root filesystem (writes go to
     # /tmp and the named volumes).
@@ -275,7 +278,7 @@ services:
     restart: unless-stopped
 
   flows:
-    image: diffplane-orchestrator:local
+    image: ghcr.io/razers211/diffplane-orchestrator:${DIFFPLANE_VERSION:-v0.1.3}
     build: *app-build
     # Hardened: no capabilities (so no privilege gain), a read-only root filesystem (writes go to
     # /tmp and the named volumes).
@@ -307,7 +310,7 @@ services:
 
   # Syslog from the switches: only messages of known switches, into ClickHouse for 90 days.
   syslog:
-    image: diffplane-orchestrator:local
+    image: ghcr.io/razers211/diffplane-orchestrator:${DIFFPLANE_VERSION:-v0.1.3}
     build: *app-build
     # Hardened: no capabilities (so no privilege gain), a read-only root filesystem (writes go to
     # /tmp and the named volumes).
@@ -339,7 +342,7 @@ services:
   # (_management_vpn_) with a one-time account. Set SFTP_BIND to this host's address the switches
   # reach (the platform address in Settings) and SFTP_PORT to its port. Localhost by default.
   sftpd:
-    image: diffplane-orchestrator:local
+    image: ghcr.io/razers211/diffplane-orchestrator:${DIFFPLANE_VERSION:-v0.1.3}
     build: *app-build
     # Hardened: no capabilities (so no privilege gain), a read-only root filesystem (writes go to
     # /tmp and the named volumes).
@@ -365,7 +368,7 @@ services:
   ztp:
     build:
       context: ./ztp
-    image: diffplane-ztp:local
+    image: ghcr.io/razers211/diffplane-ztp:${DIFFPLANE_VERSION:-v0.1.3}
     profiles: ["ztp"]
     network_mode: host
     cap_add: [NET_ADMIN]

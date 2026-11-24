@@ -5,6 +5,8 @@
 # gets no lease, and that a host with no registration can read nothing, not even by path.
 # Run from deploy/ after `docker compose build orchestrator ztp`:  sh ztp/selftest.sh
 set -eu
+ORCH="ghcr.io/razers211/diffplane-orchestrator:${DIFFPLANE_VERSION:-v0.1.3}"
+ZTPIMG="ghcr.io/razers211/diffplane-ztp:${DIFFPLANE_VERSION:-v0.1.3}"
 NET=ztp-selftest
 VOL=ztp-selftest
 KNOWN=02:00:00:00:00:01
@@ -23,7 +25,7 @@ docker network create --subnet 10.199.0.0/24 "$NET" >/dev/null
 docker volume create "$VOL" >/dev/null
 
 # The orchestrator's code writes the files, as for a real registration (no NetBox needed).
-docker run --rm -u 0 -v "$VOL":/ztp --entrypoint python diffplane-orchestrator:local -c '
+docker run --rm -u 0 -v "$VOL":/ztp --entrypoint python "$ORCH" -c '
 import os
 from pathlib import Path
 from orchestrator import ztp
@@ -43,7 +45,7 @@ for p in root.rglob("*"):
 '
 
 docker run -d --name ztp-selftest-dnsmasq --network "$NET" --ip 10.199.0.2 --cap-add NET_ADMIN \
-  -v "$VOL":/ztp:ro diffplane-ztp:local >/dev/null
+  -v "$VOL":/ztp:ro "$ZTPIMG" >/dev/null
 sleep 8
 
 # Clients: a small Python DHCP/TFTP client in the orchestrator image (deploy/ztp/selftest_client.py).
@@ -52,7 +54,7 @@ HERE=$(cd "$(dirname "$0")" && pwd)
 client() {  # client <ip> <args...>: prints the client's output, returns its exit code
   ip=$1; shift
   docker run --rm -u 0 --network "$NET" --ip "$ip" -v "$HERE/selftest_client.py:/selftest_client.py:ro" \
-    --entrypoint python diffplane-orchestrator:local /selftest_client.py "$@"
+    --entrypoint python "$ORCH" /selftest_client.py "$@"
 }
 check() {  # check <label> <expected exit code> <ip> <args...>
   label=$1; want=$2; shift 2

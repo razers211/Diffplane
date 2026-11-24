@@ -28,8 +28,18 @@ after a few tries; that is expected.
 ## 2. Start
 
 ```sh
-docker compose up --build -d
+docker compose up -d
 docker compose ps                               # wait until everything is healthy
+```
+
+This pulls the release images named in `deploy/compose.yaml` from ghcr.io. They match a checkout of
+that release tag; on a later commit, or to run code you changed, use `docker compose up --build -d`
+to build them here instead (takes a while). To check an image's signature first:
+
+```sh
+cosign verify ghcr.io/razers211/diffplane-orchestrator:v0.1.3 \
+  --certificate-identity-regexp '^https://github.com/razers211/Diffplane/' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
 ```
 
 NetBox migrates its database on first start, which takes a minute or two; the orchestrator waits

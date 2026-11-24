@@ -287,8 +287,20 @@ def test_every_image_is_pinned_by_digest():
         for line in path.read_text().splitlines():
             if m := re.match(r"\s*(?:image:|FROM)\s+(?:--\S+\s+)*(\S+)", line):
                 refs.append((path.name, m.group(1)))
-    unpinned = [r for r in refs if not r[1].endswith(":local") and "@sha256:" not in r[1]]
+    # Our own release images are pinned by version and signed (cosign), not by digest.
+    unpinned = [r for r in refs if not r[1].endswith(":local") and "@sha256:" not in r[1]
+                and not r[1].startswith("ghcr.io/razers211/diffplane-")]
     assert refs and unpinned == []
+
+
+def test_scripts_default_to_the_compose_release():
+    """A release moves DIFFPLANE_VERSION's default in Compose; the scripts must use the same one."""
+    root = Path(__file__).resolve().parents[2]
+    found = {}
+    for path in ("deploy/compose.yaml", "scripts/test.sh", "deploy/ztp/selftest.sh"):
+        found[path] = set(re.findall(r"ghcr\.io/razers211/diffplane-[a-z]+:\$\{DIFFPLANE_VERSION:-(v[\d.]+)\}",
+                                     (root / path).read_text()))
+    assert all(found.values()) and len(set.union(*found.values())) == 1, found
 
 
 def test_the_lockfile_pins_every_dependency_with_hashes():

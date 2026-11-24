@@ -549,7 +549,7 @@ first blank switch and keep the console at hand.
    first-boot config also creates the platform accounts (`GNETCLI_DEV_LOGIN`,
    `COLLECTOR_LOGIN`), so their passwords must be set.
 2. **Self-test** (isolated Docker network, never the management LAN):
-   `sudo docker compose --profile ztp build && sudo sh ztp/selftest.sh`.
+   `sudo docker compose --profile ztp pull && sudo sh ztp/selftest.sh` (or `build` off a release tag).
 3. **Start DHCP/TFTP**: `sudo docker compose --profile ztp up -d`. It answers only registered
    MACs, each with its fixed address, never from a pool; unknown devices get no answer. Make sure
    no other DHCP server on the management network answers the switch first.
@@ -606,7 +606,7 @@ Start it:
 
 ```sh
 cd deploy
-sudo docker compose up -d --build
+sudo docker compose up -d                      # the release images (add --build off a release tag)
 sudo docker compose ps                         # all healthy
 ```
 
@@ -829,7 +829,8 @@ When an update changes the list of active services (`ha/agent.sh`), also run
   `/tmp/annet-deploy-logs` and contain secrets (DFS key, SNMP community) in plain text;
   they are lost when the container is recreated.
 - Generators, the rulebook and the seed are mounted into the container: changes apply to the
-  next Annet run without a rebuild. API and GUI changes need `docker compose up --build -d`.
+  next Annet run without a rebuild. API and GUI changes need `docker compose up --build -d`
+  (it builds the images from the checkout, under the release image's name).
 - If `docker compose up` stops with `dependency failed to start: container fabric-netbox-1
   exited (143)` and the NetBox log ends with `⚠ Could not load Unit configuration`, its web
   server did not come up in a container that had been restarted rather than recreated
