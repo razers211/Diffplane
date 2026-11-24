@@ -9,7 +9,7 @@ from types import SimpleNamespace
 import pytest
 from fastapi.testclient import TestClient
 
-from orchestrator import hostkeys, imports as imp
+from orchestrator import hostkeys, imports as imp, overrides
 from orchestrator.app import _intent_unfrozen, app, current_account, get_accounts, get_imports, get_netbox
 from orchestrator.hostkeys import Offer
 from orchestrator.import_preview import preview
@@ -88,6 +88,7 @@ def test_import_flow(client):
     shown = http.post(f"/imports/{session}/preview", json=CHOICES)
     assert shown.status_code == 200, shown.text
     assert shown.json()["patches"] == {"leaf1": ""}
+    assert shown.json()["entries"] == overrides.entries(shown.json()["plan"]["overrides"])
     for response in (started, approved, shown):   # the running config never leaves the orchestrator
         assert "authentication-mode" not in response.text and "PLACEHOLDER" not in response.text
 

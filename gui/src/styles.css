@@ -1581,3 +1581,11 @@ section.approval > header { border-bottom-color: var(--accent); }
 .draft-bar { background: color-mix(in oklab, var(--z-admin) 26%, var(--surface)); color: var(--text); border: 1px solid color-mix(in oklab, var(--z-admin) 70%, var(--rule)); border-left: 4px solid var(--z-admin); border-radius: 0 0 var(--radius) var(--radius); }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .shell { --zone-soft: color-mix(in oklab, var(--zone) 13%, var(--surface)); } }
 :root[data-theme="dark"] .shell { --zone-soft: color-mix(in oklab, var(--zone) 13%, var(--surface)); }
+
+/* Import fabric: the report, one card per switch */
+.import-report > h3, .import-report > p { margin: 8px 16px; }
+.import-report .panel { margin: 12px 16px; }
+.import-report .panel > header h3 { margin: 0; }
+.import-report .pad { padding: 4px 16px 12px; }
+.import-report .pad ul { margin: 4px 0 10px; }
+

@@ -183,6 +183,7 @@ export const TOURS: Partial<Record<Route["page"], TourStep[]>> = {
   "import-fabric": [
     { selector: "[data-tour='import-switches']", text: "Give the management addresses of the running switches. An approver checks each one's host key before anything is read." },
     { selector: "[data-tour='import-preview']", text: "What the platform would make of them, and what it would change on each: ideally nothing." },
+    { selector: "[data-tour='import-report']", text: "The report, one card per switch: what its first deploy would change, what it keeps the way it was found, and what the platform leaves alone." },
   ],
   changes: [
     { selector: ".change-steps", text: "Where your change is on its way to the switches: saved, patch to review, approval, deploy and verify." },

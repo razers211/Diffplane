@@ -1,10 +1,12 @@
 import { useState } from "react";
 import {
   approveImportKeys, previewImport, readImport, startImport, writeImport,
-  type ImportPreview, type ImportSession, type ImportSwitch,
+  type ImportPlan, type ImportPreview, type ImportSession, type ImportSwitch, type OverrideEntry,
 } from "./api";
 import { KeyRows } from "./HostKeys";
-import { changed, emptyDraft, offeredKeys, parseAddresses, toChoices, type ImportDraft } from "./importFabric";
+import {
+  changed, emptyDraft, importReport, offeredKeys, parseAddresses, toChoices, type ImportDraft, type SwitchReport,
+} from "./importFabric";
 import { POOL_LABELS } from "./newFabric";
 import { useCan } from "./role";
 
@@ -12,6 +14,89 @@ import { useCan } from "./role";
 // host keys compared and approved, each switch read over SSH (display commands only), then a
 // preview of the fabric they make and of the patch each would get. Nothing is written before
 // Import; deploys stay off for the new fabric until an admin turns them on.
+
+function Kept({ entries }: { entries: OverrideEntry[] }) {
+  return (
+    <ul>
+      {entries.map((e) => (
+        <li key={e.path}>
+          {e.scope !== "switch" && e.target !== null && <b>{e.scope === "segment" ? `Segment VNI ${e.target}` : e.target}: </b>}
+          {e.text} <span className="hint">Usual form: {e.derived}.{e.standard ? " Can be made standard after the import." : ""}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+// One switch of the import report: what would change on it, what it keeps as found, what the
+// platform leaves alone there.
+function SwitchCard({ r }: { r: SwitchReport }) {
+  const lines = r.patch.trim() ? r.patch.trim().split("\n").length : 0;
+  return (
+    <div className="panel">
+      <header>
+        <h3 className="mono">{r.name}</h3>
+        <span className="inline small">
+          {lines ? <span className="pill warnpill">would change</span> : <span className="pill good">reproduced exactly</span>}
+          {r.kept.length > 0 && <span className="pill">{r.kept.length} kept as found</span>}
+          {r.misfits.length > 0 && <span className="pill warnpill">{r.misfits.length} not managed</span>}
+        </span>
+      </header>
+      <div className="pad">
+        {r.misfits.length > 0 && (
+          <>
+            <p className="small"><b>Not managed</b>: the platform's model has no place for these, so it leaves them alone (or, where
+              said, the first deploy removes them).</p>
+            <ul>{r.misfits.map((m) => <li key={m}>{m}</li>)}</ul>
+          </>
+        )}
+        {r.kept.length > 0 && (
+          <>
+            <p className="small"><b>Kept as found</b>: these differ from what the platform would make, and stay as they are.</p>
+            <Kept entries={r.kept} />
+          </>
+        )}
+        {lines > 0 ? (
+          <details>
+            <summary>What its first deploy would send ({lines} lines)</summary>
+            <pre className="config">{r.patch}</pre>
+          </details>
+        ) : <p className="muted small">The platform's config for this switch is the one it runs: no patch.</p>}
+      </div>
+    </div>
+  );
+}
+
+/** The import report: the fabric's own findings, then one card per switch read. */
+export function ImportReport({ plan, entries, patches }: { plan: ImportPlan; entries: OverrideEntry[]; patches: Record<string, string> }) {
+  const changes = changed(patches).length;
+  const report = importReport(plan, entries, patches);
+  return (
+    <div className="import-report" data-tour="import-report">
+      <h3>Report</h3>
+      <p className={changes ? "muted" : "notice"}>
+        {changes === 0 ? "Every switch read is reproduced exactly: importing changes nothing on them."
+          : `${changes} of ${report.switches.length} switches would change at their first deploy; the rest are reproduced exactly.`}
+        {" "}Nothing is deployed by the import itself.
+      </p>
+      {(report.kept.length > 0 || report.misfits.length > 0) && (
+        <div className="panel">
+          <header><h3>The fabric</h3></header>
+          <div className="pad">
+            {report.misfits.length > 0 && (
+              <>
+                <p className="small"><b>Not managed</b></p>
+                <ul>{report.misfits.flatMap(([where, list]) => list.map((m) => <li key={where + m}><b>{where}</b>: {m}</li>))}</ul>
+              </>
+            )}
+            {report.kept.length > 0 && (<><p className="small"><b>Kept as found</b></p><Kept entries={report.kept} /></>)}
+          </div>
+        </div>
+      )}
+      {report.switches.map((r) => <SwitchCard key={r.name} r={r} />)}
+    </div>
+  );
+}
 
 const clean = (e: unknown) => (e instanceof Error ? e.message : String(e)).replace(/^\d+: /, "");
 
@@ -185,14 +270,6 @@ export function ImportFabric({ onCreated }: { onCreated: (site: string) => void 
                 ({plan.devices.filter((d) => d.planned).length} planned) · {plan.links.length} links · {plan.segments.length} segments ·{" "}
                 {plan.services.length} services
               </p>
-              {Object.keys(plan.misfits).length > 0 && (
-                <div className="warning">
-                  <b>Does not fit the platform's model</b>
-                  <ul>
-                    {Object.entries(plan.misfits).flatMap(([where, list]) => list.map((m) => <li key={where + m}><b>{where}</b>: {m}</li>))}
-                  </ul>
-                </div>
-              )}
               <table className="devices">
                 <thead><tr><th>Switch</th><th>Role</th><th>Model</th><th>Management</th><th>LoopBack0</th><th>VTEP</th></tr></thead>
                 <tbody>
@@ -213,22 +290,9 @@ export function ImportFabric({ onCreated }: { onCreated: (site: string) => void 
                   ))}
                 </tbody>
               </table>
-              {Object.keys(plan.overrides).length > 0 && (
-                <p className="muted small">Values adopted from the switches (they differ from what the platform derives):{" "}
-                  <code>{JSON.stringify(plan.overrides)}</code></p>
-              )}
             </>
           )}
-          {preview.patches && (toChange.length === 0 ? (
-            <p className="notice">Every switch read is reproduced exactly: importing changes nothing on them.</p>
-          ) : (
-            toChange.map((n) => (
-              <div key={n}>
-                <h3>{n}: the platform would change</h3>
-                <pre className="config">{patches[n]}</pre>
-              </div>
-            ))
-          ))}
+          {plan && preview.patches && <ImportReport plan={plan} entries={preview.entries ?? []} patches={patches} />}
           {plan && !preview.error && session.switches.some((s) => s.in_netbox) && (
             <p className="muted small">A switch here is already in NetBox: this import can be previewed, not written.</p>
           )}

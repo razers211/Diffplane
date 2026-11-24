@@ -798,7 +798,7 @@ export interface ImportPlan {
   overrides: Record<string, unknown>;
   misfits: Record<string, string[]>;
 }
-export interface ImportPreview { plan?: ImportPlan; patches?: Record<string, string>; error?: string }
+export interface ImportPreview { plan?: ImportPlan; patches?: Record<string, string>; entries?: OverrideEntry[]; error?: string }
 export const startImport = (addresses: string[]) => post<ImportSession>("/imports", { body: { addresses } });
 export const approveImportKeys = (id: string, address: string, keys: string[]) =>
   post<ImportSession>("/imports/{import_id}/approve", { path: { import_id: id }, body: { address, keys } });

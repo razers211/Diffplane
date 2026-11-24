@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { ImportSwitch } from "./api";
-import { changed, emptyDraft, offeredKeys, parseAddresses, toChoices } from "./importFabric";
+import type { ImportPlan, ImportSwitch, OverrideEntry } from "./api";
+import { changed, emptyDraft, importReport, offeredKeys, parseAddresses, toChoices } from "./importFabric";
 
 const key = (k: string) => ({ key: k, type: "ssh-rsa", sha256: "SHA256:x", md5: "00" });
 
@@ -20,5 +20,19 @@ describe("import fabric", () => {
   });
   it("lists the switches the platform would change", () => {
     expect(changed({ b: "x\n", a: "", c: " \n" })).toEqual(["b"]);
+  });
+  it("groups the report per switch read, busy switches first", () => {
+    const entry = (scope: string, target: string | null) => ({ scope, target, path: `${scope}/${target}` }) as OverrideEntry;
+    const plan = {
+      devices: [{ name: "a", planned: false }, { name: "b", planned: false }, { name: "c", planned: true }],
+      misfits: { b: ["VLAN-based port 10GE1/0/1"], c: [], "segment 10": ["no gateway MAC"] },
+    } as unknown as ImportPlan;
+    const kept = [entry("switch", "a"), entry("switch", "c"), entry("fabric", null)];
+    const report = importReport(plan, kept, { a: "", b: "+ interface X" });
+    expect(report.switches.map((s) => s.name)).toEqual(["b", "a"]);
+    expect(report.switches[1].kept).toEqual([kept[0]]);
+    expect(report.switches[0].misfits).toEqual(["VLAN-based port 10GE1/0/1"]);
+    expect(report.kept).toEqual([kept[1], kept[2]]);   // a planned switch's values go under the fabric
+    expect(report.misfits).toEqual([["segment 10", ["no gateway MAC"]]]);
   });
 });

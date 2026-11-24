@@ -97,6 +97,7 @@ More: [architecture](docs/architecture.md), [concepts](docs/concepts.md). To run
 | [Concepts](docs/concepts.md) | fabrics, segments, services, routing intent, import, deploy waves |
 | [Supported switches](docs/supported-switches.md) | models, software, what is verified |
 | [Security model](docs/security-model.md) | what protects the switches, secrets, known risks |
+| [Onboarding](docs/onboarding.md) | an existing fabric: import, a week diff-only, then deploys on |
 | [Operations](docs/operations.md) | users, drift, alerts, backups, onboarding, HA, upgrades |
 | [Roadmap](ROADMAP.md) | what exists and what needs verification |
 

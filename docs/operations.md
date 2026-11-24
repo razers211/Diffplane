@@ -422,9 +422,9 @@ Goal: model an existing production fabric so that `annet diff` is empty on every
 without the platform sending a single command. Deploys stay off for that fabric until an
 admin turns them on.
 
-1. **Keep deploys off.** `DEPLOY_ALLOWED_SITES` in `deploy/.env` must not list the new
-   fabric (the default is empty: no fabric). The orchestrator refuses deploys to any other fabric.
-   Turning it on later is a deliberate decision.
+1. **Keep deploys off.** A new fabric starts with deploys off unless `DEPLOY_ALLOWED_SITES` in
+   `deploy/.env` lists it (the default is empty: no fabric). Turning them on later is a deliberate
+   decision (step 8).
 2. **Confirm the open facts**: exact switch models and VRP release (see
    [supported switches](supported-switches.md); anything else is unverified), NETCONF availability,
    fabric size, border leaves.
@@ -461,9 +461,9 @@ admin turns them on.
      ...) never appears and is never touched.
 7. **Repeat 5–6** until every device's diff is empty, or what remains is an agreed change.
    Keep the final diff output with the change record.
-8. **Turn deploys on** only when you are ready: add the fabric to
-   `DEPLOY_ALLOWED_SITES`, restart the orchestrator. First deploy: one device, one
-   generator (e.g. `Snmp`), in a maintenance window; then one leaf pair at a time.
+8. **Turn deploys on** only when you are ready: an admin, on the Fabric page (**Allow deploys…**,
+   as in [Onboarding](onboarding.md#3-turn-deploys-on)). First deploy: one small change, in a
+   change window; then larger ones, one concern at a time.
    Multi-device behaviour (M-LAG negotiation, EVPN between VTEPs, routing between
    leaves) has not been verified on real hardware: watch the topology and BGP state after
    each step.
@@ -483,11 +483,13 @@ GUI: **Fabric** page, **Import fabric**. Read-only until the last step.
    `display current-configuration`. The outputs stay in the orchestrator's memory (they hold
    secrets) until the import is written or the orchestrator restarts.
 4. **Preview**: name the fabric, give the gateways pool if no routed segment shows it, change
-   roles (border leaves), architecture or pools if needed. Read every misfit and every
-   non-empty patch: the patch is what the first deploy would send. Switches the given ones
+   roles (border leaves), architecture or pools if needed. Read the report: one card per switch
+   with its patch (what the first deploy would send), the values it keeps as found and what is
+   not managed. Switches the given ones
    point at but that were not given (an unbuilt peer or spine) become planned placeholders.
 5. **Import** writes the fabric to NetBox, the read switches active and pinned. Deploys stay
-   off for it (`DEPLOY_ALLOWED_SITES`); continue as in "First production onboarding" from step 6.
+   off for it; continue with [Onboarding](onboarding.md#2-diff-only-for-a-week): a week diff-only,
+   then deploys on.
 
 ## Bringing up a new fabric (greenfield)
 

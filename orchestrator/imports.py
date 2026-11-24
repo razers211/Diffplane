@@ -193,8 +193,12 @@ class Imports:
     async def preview(self, session_id: str, choices: dict) -> dict:
         from orchestrator.redact import redact
 
+        from orchestrator.overrides import entries
+
         request = self._request(self._session(session_id), choices)
         result = await self.run_preview(request)
+        if result.get("plan"):   # the values kept as found, in the catalogue's plain words
+            result["entries"] = entries(result["plan"]["overrides"])
         return json.loads(redact(json.dumps(result)))
 
     async def write(self, netbox, session_id: str, choices: dict) -> dict:
