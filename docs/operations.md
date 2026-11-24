@@ -828,9 +828,10 @@ When an update changes the list of active services (`ha/agent.sh`), also run
   switch rejected). Transcripts live in the orchestrator container under
   `/tmp/annet-deploy-logs` and contain secrets (DFS key, SNMP community) in plain text;
   they are lost when the container is recreated.
-- Generators, the rulebook and the seed are mounted into the container: changes apply to the
-  next Annet run without a rebuild. API and GUI changes need `docker compose up --build -d`
-  (it builds the images from the checkout, under the release image's name).
+- Changes to the code need `docker compose up --build -d` (it builds the images from the
+  checkout, under the release image's name). For development, `-f compose.yaml -f compose.dev.yaml`
+  also mounts the checkout's generators, rulebook, seed, collector, flows and syslogs, so their
+  changes apply to the next run without a rebuild.
 - If `docker compose up` stops with `dependency failed to start: container fabric-netbox-1
   exited (143)` and the NetBox log ends with `⚠ Could not load Unit configuration`, its web
   server did not come up in a container that had been restarted rather than recreated

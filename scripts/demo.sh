@@ -27,8 +27,8 @@ elif grep -q '^MLAG_DFS_PASSWORD=$' .env; then
   echo "note: MLAG_DFS_PASSWORD is empty in deploy/.env: leaves' configs will not generate until it is set" >&2
 fi
 
-echo "Building and starting (the first run takes several minutes: images, then NetBox's migrations)..."
-dc up --build -d
+echo "Downloading and starting (the first run takes a few minutes: images, then NetBox's migrations)..."
+dc up -d   # the release images named in deploy/compose.yaml (pulled, signed)
 
 printf 'Waiting for the orchestrator'
 i=0

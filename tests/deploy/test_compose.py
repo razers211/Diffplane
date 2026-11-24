@@ -124,14 +124,20 @@ def test_deploys_are_limited_to_the_lab_by_default():
 
 
 def test_mounted_code_wins_over_the_installed_copy():
-    # `pip install .` copies generators/ and rulebook/ into site-packages; compose mounts the
-    # live folders at /app. Every process must import the mounted ones, or a manual
+    # `pip install .` copies generators/ and rulebook/ into site-packages; compose.dev.yaml mounts
+    # the live folders at /app. Every process must import the mounted ones, or a manual
     # `annet diff` runs older generators than the orchestrator's deploys (example).
     dockerfile = (DEPLOY.parent / "orchestrator" / "Dockerfile").read_text()
     assert re.search(r"^\s*PYTHONPATH=/app\b", dockerfile, re.M)
-    mounts = load_compose()["services"]["orchestrator"]["volumes"]
+    mounts = yaml.safe_load((DEPLOY / "compose.dev.yaml").read_text())["services"]["orchestrator"]["volumes"]
     for package in ("generators", "rulebook", "seed"):
         assert f"../{package}:/app/{package}:ro" in mounts
+
+
+def test_an_image_runs_only_its_own_code():
+    """A pulled release image with the checkout's code mounted over it would mix two versions."""
+    for name, service in load_compose()["services"].items():
+        assert not [v for v in service.get("volumes", []) if v.startswith("../")], name
 
 
 def load_alert_rules() -> list[dict]:

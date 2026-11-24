@@ -1,0 +1,20 @@
+# Development: the checkout's Python code mounted over the image's, so changes to generators, the
+# rulebook, the seed, the collector, flows and syslogs apply without a rebuild (PYTHONPATH=/app).
+# Only with an image built from this checkout, never over a pulled release image:
+#   docker compose -f compose.yaml -f compose.dev.yaml up -d --build
+services:
+  orchestrator:
+    volumes:
+      - ../seed:/app/seed:ro
+      - ../generators:/app/generators:ro
+      - ../rulebook:/app/rulebook:ro
+      - ../collector:/app/collector:ro
+  collector:
+    volumes:
+      - ../collector:/app/collector:ro
+  flows:
+    volumes:
+      - ../flows:/app/flows:ro
+  syslog:
+    volumes:
+      - ../syslogs:/app/syslogs:ro

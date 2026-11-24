@@ -2,7 +2,8 @@
 #   python3 gen_env.py && docker compose up -d
 # The orchestrator and ZTP images are the signed release images from ghcr.io (DIFFPLANE_VERSION,
 # default the release below; each release moves it). `up --build` builds them from this checkout
-# instead: needed on a commit after that release, or after changing API or GUI code.
+# instead: needed on a commit after that release, or after changing API or GUI code. Each image
+# runs only its own code; compose.dev.yaml mounts the checkout's over it for development.
 # NetBox publishes no ports: only the orchestrator talks to it, over the Compose network.
 name: diffplane
 
@@ -197,11 +198,6 @@ services:
       SFTP_ADDRESS: ${SFTP_ADDRESS:-}   # where the switches reach the image server (also in Settings)
       SFTP_PORT: ${SFTP_PORT:-2222}   # the port the switches download from (the published one)
     volumes:
-      # Fabric definitions, seed script, generators and rulebook, editable without rebuilding the image.
-      - ../seed:/app/seed:ro
-      - ../generators:/app/generators:ro
-      - ../rulebook:/app/rulebook:ro
-      - ../collector:/app/collector:ro
       # Certificate and key; certificate only, for Prometheus.
       - orchestrator-tls:/tls
       - orchestrator-tls-public:/tls-public
@@ -250,7 +246,6 @@ services:
       COLLECTOR_HARDWARE_INTERVAL: "50"
       PLATFORM_SHARED: /shared   # the login set in the GUI's settings, re-read at each reconnect
     volumes:
-      - ../collector:/app/collector:ro
       - platform-shared:/shared:ro
     depends_on:
       netbox:
@@ -299,8 +294,6 @@ services:
     # than needed. Localhost by default, like the orchestrator. Unknown exporters are dropped.
     ports:
       - "${FLOWS_BIND:-127.0.0.1}:${FLOWS_PORT:-2055}:2055/udp"
-    volumes:
-      - ../flows:/app/flows:ro
     depends_on:
       netbox:
         condition: service_healthy
@@ -329,8 +322,6 @@ services:
     # SYSLOG_BIND to that address of this host, and SYSLOG_PORT to that page's port. Localhost by default.
     ports:
       - "${SYSLOG_BIND:-127.0.0.1}:${SYSLOG_PORT:-514}:5514/udp"
-    volumes:
-      - ../syslogs:/app/syslogs:ro
     depends_on:
       netbox:
         condition: service_healthy
