@@ -1,0 +1,57 @@
+name: Release images
+
+# A version tag (v1.2.3) builds both images Compose needs for linux/amd64 and linux/arm64 and
+# pushes them to GitHub's container registry, tagged with the version and `latest`.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  images:
+    name: Build and push ${{ matrix.name }}
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: diffplane-orchestrator
+            context: .
+            file: orchestrator/Dockerfile
+          - name: diffplane-ztp
+            context: deploy/ztp
+            file: deploy/ztp/Dockerfile
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Image name
+        id: image
+        # The registry wants a lower-case owner.
+        run: echo "ref=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/${{ matrix.name }}" >> "$GITHUB_OUTPUT"
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.file }}
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ${{ steps.image.outputs.ref }}:${{ github.ref_name }}
+            ${{ steps.image.outputs.ref }}:latest
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.version=${{ github.ref_name }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.licenses=Apache-2.0
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}

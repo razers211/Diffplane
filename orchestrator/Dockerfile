@@ -1,4 +1,6 @@
 # Build context is the repository root (see deploy/compose.yaml).
+# Multi-arch (the release workflow): the Go and GUI stages run on the build machine and
+# cross-compile; only the final stage is built for the target platform.
 
 # gnetcli server: Annet's transport to the switches (fetch and deploy).
 # Keep the version in step with the gnetclisdk Python package that gnetcli_adapter pulls in.
@@ -8,7 +10,8 @@
 # Both Go tools are built with a supported Go, and their dependencies with known CVEs are raised
 # to fixed versions (`go get`; x/net brings matching x/crypto and x/text). The upstream releases
 # stay pinned, and their whole test suites run. Raise them again when `trivy image` reports more.
-FROM docker.io/golang:1.27-bookworm@sha256:4fa7c968ba93f1635670522dbb01a2c78150443e1385746924566079f36570ea AS gnetcli
+FROM --platform=$BUILDPLATFORM docker.io/golang:1.27-bookworm@sha256:4fa7c968ba93f1635670522dbb01a2c78150443e1385746924566079f36570ea AS gnetcli
+ARG TARGETOS TARGETARCH
 ARG GNETCLI_VERSION=v1.3.17
 COPY deploy/gnetcli/known-hosts.patch /tmp/known-hosts.patch
 RUN git clone --quiet --depth 1 --branch ${GNETCLI_VERSION} https://github.com/annetutil/gnetcli /src/gnetcli \
@@ -17,20 +20,21 @@ RUN git clone --quiet --depth 1 --branch ${GNETCLI_VERSION} https://github.com/a
  && go get google.golang.org/grpc@v1.83.2 golang.org/x/net@v0.60.0 \
  && go mod tidy \
  && go test ./... \
- && CGO_ENABLED=0 go build -o /out/gnetcli_server ./cmd/gnetcli_server
+ && CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -o /out/gnetcli_server ./cmd/gnetcli_server
 
 # GoFlow2: the NetFlow v9 decoder the flows service runs (python -m flows). Pinned.
-FROM docker.io/golang:1.27-bookworm@sha256:4fa7c968ba93f1635670522dbb01a2c78150443e1385746924566079f36570ea AS goflow2
+FROM --platform=$BUILDPLATFORM docker.io/golang:1.27-bookworm@sha256:4fa7c968ba93f1635670522dbb01a2c78150443e1385746924566079f36570ea AS goflow2
+ARG TARGETOS TARGETARCH
 ARG GOFLOW2_VERSION=v2.2.3
 RUN git clone --quiet --depth 1 --branch ${GOFLOW2_VERSION} https://github.com/netsampler/goflow2 /src/goflow2 \
  && cd /src/goflow2 \
  && go get golang.org/x/net@v0.60.0 github.com/klauspost/compress@v1.18.7 \
  && go mod tidy \
  && go test ./... \
- && CGO_ENABLED=0 go build -o /out/goflow2 ./cmd/goflow2
+ && CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -o /out/goflow2 ./cmd/goflow2
 
 # GUI: built once here, served by the orchestrator at /ui/.
-FROM docker.io/node:24-bookworm-slim@sha256:dc26ae92c9fb15cf6b1d63e20f0944b2efe0f115b20e00be48fb23fceb061c54 AS gui
+FROM --platform=$BUILDPLATFORM docker.io/node:24-bookworm-slim@sha256:dc26ae92c9fb15cf6b1d63e20f0944b2efe0f115b20e00be48fb23fceb061c54 AS gui
 WORKDIR /gui
 COPY gui/package.json gui/package-lock.json ./
 RUN npm ci --no-audit --no-fund
