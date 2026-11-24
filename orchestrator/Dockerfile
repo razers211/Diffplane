@@ -17,7 +17,7 @@ COPY deploy/gnetcli/known-hosts.patch /tmp/known-hosts.patch
 RUN git clone --quiet --depth 1 --branch ${GNETCLI_VERSION} https://github.com/annetutil/gnetcli /src/gnetcli \
  && cd /src/gnetcli \
  && git apply /tmp/known-hosts.patch \
- && go get google.golang.org/grpc@v1.83.2 golang.org/x/net@v0.60.0 \
+ && go get google.golang.org/grpc@v1.83.2 golang.org/x/net@v0.62.0 \
  && go mod tidy \
  && go test ./... \
  && CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -o /out/gnetcli_server ./cmd/gnetcli_server
@@ -28,7 +28,7 @@ ARG TARGETOS TARGETARCH
 ARG GOFLOW2_VERSION=v2.2.3
 RUN git clone --quiet --depth 1 --branch ${GOFLOW2_VERSION} https://github.com/netsampler/goflow2 /src/goflow2 \
  && cd /src/goflow2 \
- && go get golang.org/x/net@v0.60.0 github.com/klauspost/compress@v1.18.7 \
+ && go get golang.org/x/net@v0.62.0 github.com/klauspost/compress@v1.18.7 \
  && go mod tidy \
  && go test ./... \
  && CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -o /out/goflow2 ./cmd/goflow2
@@ -44,6 +44,9 @@ RUN npm test && npm run build
 # Alpine: no util-linux, systemd, perl or the rest of Debian's base system, whose CVEs Debian had
 # not fixed. Every locked dependency installs from a musl wheel; the Go binaries are static.
 FROM docker.io/python:3.12-alpine@sha256:c5ba3deef00c7758561a0f03c26f44f10589263d40e732b8748e0d1f38f6dd89
+# Alpine packages with a fixed CVE the pinned base image does not have yet (trivy image); drop
+# once Dependabot brings a base digest with them.
+RUN apk upgrade --no-cache krb5-libs
 
 COPY --from=gnetcli /out/gnetcli_server /usr/local/bin/gnetcli_server
 COPY --from=goflow2 /out/goflow2 /usr/local/bin/goflow2
