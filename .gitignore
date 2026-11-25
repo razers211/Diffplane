@@ -31,17 +31,5 @@ deploy/ha/out/
 deploy/ha/tls/
 deploy/ha/tls-public/
 
-# Local tooling and editor files, never in the repo
-/.agents/
-/.claude/
-/skills-lock.json
-/CLAUDE.local.md
-/floorplan/
-/graphify-out/
+# Editor files
 *.kate-swp
-
-# Contributor and agent notes, kept out of the published branch (they live on dev)
-CLAUDE.md
-PLAN.md
-AGENTS.md
-/.impeccable/
