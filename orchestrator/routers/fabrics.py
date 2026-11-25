@@ -19,11 +19,13 @@ from orchestrator.deps import (
     ADMIN, APPROVE, current_user, get_access, get_accounts, get_annet, get_netbox, get_routing_store,
     get_settings, INTENT_WRITE, LOGIN, _segment_call,
 )
+from orchestrator.answers import Fabric
+
 
 router = APIRouter()
 
 
-@router.get("/fabrics", dependencies=[LOGIN])
+@router.get("/fabrics", dependencies=[LOGIN], response_model=list[Fabric], response_model_exclude_unset=True)
 async def list_fabrics(netbox: NetBoxClient = Depends(get_netbox), access: Access = Depends(get_access)) -> list[dict]:
     """Every fabric (a NetBox site with a seeded fabric context), for the GUI's fabric picker."""
     try:

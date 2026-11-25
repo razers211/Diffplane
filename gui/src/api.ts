@@ -7,7 +7,9 @@ import type { DeviceRouting, ImportReport, RoutingDocument, RoutingTarget } from
 import type { Contract, GbpService, Microseg, MicrosegMode, SwitchState } from "./microseg";
 import type { QosMark, QosView } from "./qos";
 import type { DciDocument, DciLink, DciSegment, DciSide } from "./dci";
-import type { paths } from "./schema";
+import type { components, paths } from "./schema";
+/** Answers the API declares a response model for (orchestrator/answers.py). */
+type Answers = components["schemas"];
 
 // Every call names its route as the orchestrator's OpenAPI schema does (src/schema.d.ts, made from
 // openapi.json), so a route changed or removed in the API, or called with a method it does not take,
@@ -38,21 +40,7 @@ export function url(route: string, { path, query }: Parts = {}): string {
 export type LinkStatus = "ok" | "missing" | "mismatch" | "unverified" | "unexpected";
 export type EndCheck = LinkStatus;
 
-export interface Device {
-  name: string;
-  site: string | null;
-  role: string | null;
-  status: string | null;
-  primary_ip: string | null;
-  // Where it is: NetBox location (room/hall), rack, lowest U and face.
-  location: string | null;
-  rack: string | null;
-  position: number | null;
-  face: "front" | "rear" | null;
-  pinned: boolean; // SSH host keys pinned (nothing connects to it before)
-  meth_mac?: string | null; // MEth MAC brought from the inventory, offered to ZTP
-  peer?: string | null; // M-LAG peer
-}
+export type Device = Answers["Device"];
 
 export interface TopologyNode {
   name: string;
@@ -83,63 +71,24 @@ export interface Topology {
   telemetry: { ok: boolean; error: string | null };
 }
 
-export interface DiffSnapshot {
-  device: string;
-  status: "pending" | "ok" | "error";
-  has_changes: boolean | null;
-  diff: string | null;
-  error: string | null;
-  created_at: string;
-  finished_at: string | null;
-  job_id: number;
-  job_kind: string | null; // "diff", "drift", or "deploy" (recorded when a deploy was verified)
-}
+export type DiffSnapshot = Answers["DiffSnapshot"];
 
-export interface DiffJob {
-  id: number;
-  kind: string; // "diff" (a user) or "drift" (the scheduler)
-  requested_by: string | null;
-  status: "running" | "done" | "failed";
-  site: string | null;
-  created_at: string;
-  finished_at: string | null;
-  error: string | null;
-  devices: number;
-  changed: number;
-  errors: number;
-  snapshots?: DiffSnapshot[];
-}
+export type DiffJob = Answers["DiffJob"];
 
-export interface DeployStep {
-  device: string;
+// The API's own types, narrowed where the GUI knows the values (statuses, checks, params).
+export type DeployStep = Answers["DeployStep"] & {
   status: "pending" | "diffed" | "unchanged" | "deploying" | "verifying" | "verified" | "failed" | "skipped"
     | "upgrading" | "rebooting";   // upgrades
-  patch: string | null;
-  error: string | null;
-  started_at: string | null;
-  finished_at: string | null;
-}
+};
 
-export interface DeployJob {
-  id: number;
+export type DeployJob = Omit<Answers["DeployJob"], "steps" | "checks" | "params"> & {
   status: "queued" | "preparing" | "diffed" | "unchanged" | "approved" | "deploying" | "verified" | "failed"
     | "scheduled" | "reapproval" | "cancelled" | "stopped";   // change windows
-  site: string | null;
-  requested_by: string | null;
-  approved_by: string | null;
-  approved_at: string | null;
-  generators: string[] | null;
-  created_at: string;
-  finished_at: string | null;
-  error: string | null;
   checks?: DeployChecks | null;   // pre-deploy checks, as when prepared or last approved
-  window_start?: string | null;   // approved for a change window
-  window_end?: string | null;
   // change_set: a draft's deploy; new_patches/asked: the window waits for an approver (status reapproval)
   params?: { change_set?: number; new_patches?: Record<string, string>; asked?: string; reapproved_by?: string } | null;
   steps: DeployStep[];
-  log?: { at: string; device: string | null; level: string; message: string }[];
-}
+};
 
 // -- pre-deploy checks -------------------------------------------------------------------
 export interface CheckFinding { severity: "error" | "warning"; check: string; text: string; objects: string[] }
@@ -216,11 +165,7 @@ export const startDiffJob = (scope: { site?: string; devices?: string[] }) =>
 export type Role = "viewer" | "operator" | "approver" | "admin";
 /** Fabrics an account is limited to: null reaches every fabric; else site -> may approve deploys there. */
 export type FabricLimits = Record<string, boolean> | null;
-export interface Me {
-  username: string;
-  role: Role;
-  fabrics?: FabricLimits;
-}
+export type Me = Answers["Me"];
 export const fetchMe = () => get<Me>("/auth/me");
 export const fetchSetup = () => get<{ needed: boolean }>("/setup");
 export const claimSetup = (code: string, username: string, password: string) => post<Me>("/setup", { body: { code, username, password } });
@@ -323,22 +268,9 @@ export const requestUpgrade = (body: { devices: string[]; system: number | null;
   post<{ id: number }>("/upgrade-jobs", { body });
 export const approveUpgrade = (id: number) => post<{ id: number }>("/upgrade-jobs/{job_id}/approve", { path: { job_id: id } });
 
-export interface Segment {
-  fabric: string | null; // null: from before fabrics, delete only
-  name: string;
-  vni: number;
-  bd_id: number;
-  routing: Routing | null;
-  attachments: { device: string; interface: string; vid: number | null }[];
-}
+export type Segment = Answers["Segment"];
 
-export interface Routing {
-  gateway: string; // anycast gateway address/length, the subnet's first host
-  peers: number[]; // VNIs of explicitly peered segments
-  firewall: string | null; // firewall service for the default route, or none
-  relay?: Relay | null; // DHCP relay
-  ipv6?: SegmentIpv6 | null; // dual-stack
-}
+export type Routing = Answers["Routing"];
 
 // IPv6 of a routed segment: its /64's ::1, how hosts get addresses, DHCPv6 servers.
 export type Ipv6Hosts = "slaac" | "dhcpv6" | "none";
@@ -430,27 +362,9 @@ export const setRouting = (
 
 export type DriftState = "in_sync" | "out_of_sync" | "error" | "unknown";
 
-export interface DriftDevice {
-  device: string;
-  site: string | null;
-  state: DriftState;
-  checked_at: string | null;
-  job_id: number | null;
-  job_kind: string | null;
-  diff: string | null;
-  error: string | null;
-}
+export type DriftDevice = Answers["DriftDevice"] & { state: DriftState };
 
-export interface Drift {
-  scheduler: {
-    interval_seconds: number;
-    last_started: number | null; // unix seconds
-    last_job_id: number | null;
-    last_skip: string | null;
-    next_run: number | null;
-  } | null;
-  devices: DriftDevice[];
-}
+export type Drift = Answers["Drift"];
 
 export const fetchDrift = () => get<Drift>("/drift");
 
@@ -532,11 +446,7 @@ export interface FabricDeletion {
 export const fetchFabricDeletion = (site: string) => get<FabricDeletion>("/fabrics/{site}/deletion", { path: { site } });
 export const deleteFabric = (site: string, confirm: string) => del<FabricDeletion>("/fabrics/{site}", { path: { site }, body: { confirm } });
 
-export interface Fabric {
-  site: string;
-  name: string;
-  architecture: "symmetric" | "centralized";
-}
+export type Fabric = Answers["Fabric"];
 export const fetchFabrics = () => get<Fabric[]>("/fabrics");
 
 export const fetchOverview = (site?: string) => get<OverviewData>("/overview", { query: { site: site || undefined } });

@@ -367,13 +367,14 @@ function SegmentCard({
   };
 
   const rename = () => {
+    const bd = segment.bd_id ?? "";   // none only on a segment from before fabrics
     const answer = window.prompt(`New name for segment ${segment.name}`, segment.name)?.trim();
     if (!answer || answer === segment.name) return;
-    const problem = nameError(answer, segment.bd_id);
+    const problem = nameError(answer, bd);
     if (problem) return setError(problem);
     if (segment.routing && !window.confirm(
-      `${segment.name} is routed: its VPN instance ${segmentVpn(segment.name, segment.bd_id)} is replaced by ` +
-      `${segmentVpn(answer, segment.bd_id)} at the next deploy, and routing in this segment is interrupted ` +
+      `${segment.name} is routed: its VPN instance ${segmentVpn(segment.name, bd)} is replaced by ` +
+      `${segmentVpn(answer, bd)} at the next deploy, and routing in this segment is interrupted ` +
       "during that deploy. Routing intent that names the instance follows. Rename?")) return;
     act(() => renameSegment(fabric, segment.vni, answer), `Segment ${segment.name} renamed to ${answer}.`);
   };

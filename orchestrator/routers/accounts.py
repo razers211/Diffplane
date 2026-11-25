@@ -19,6 +19,8 @@ from orchestrator.deps import (
     _netbox,
 )
 from orchestrator.routers.fabrics import list_fabrics
+from orchestrator.answers import Me
+
 
 router = APIRouter()
 
@@ -91,7 +93,7 @@ async def logout(
     return {}
 
 
-@router.get("/auth/me", dependencies=[LOGIN])
+@router.get("/auth/me", dependencies=[LOGIN], response_model=Me, response_model_exclude_unset=True)
 async def me(account: db.User = Depends(current_account)) -> dict:
     # fabrics: None reaches every fabric; else {site: may approve deploys there}.
     return {"username": account.username, "role": account.role, "fabrics": Access.of(account).fabrics,

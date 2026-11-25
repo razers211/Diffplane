@@ -52,8 +52,10 @@ for users.
    run is killed with its gnetcli server. Annet stays pinned; a test runs each command with it.
 4. **One typed API client for the GUI (done).** Every call names its route as the orchestrator's
    OpenAPI schema does, with types generated from it (openapi-typescript), so a changed or removed
-   endpoint, or a method it does not take, fails the type check. Answers are still typed by hand:
-   giving the API response models would let them be generated too.
+   endpoint, or a method it does not take, fails the type check. The main routes' answers (fabrics,
+   switches, segments, services, diff and deploy jobs, drift, the signed-in account) have response
+   models (`orchestrator/answers.py`), so their GUI types are generated too; the rest are typed by
+   hand, a model added when a route's answer is worth a contract.
 5. **Read-path services in Go.** The collector, the syslog receiver, the flow aggregator and the
    image server are small, I/O-bound and standalone; Go fits them (gnetcli, GoFlow2 and
    Prometheus are Go already) and builds them to small static binaries. Each one is replaced

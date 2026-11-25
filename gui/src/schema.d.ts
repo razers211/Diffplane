@@ -3271,6 +3271,15 @@ export interface components {
             /** Regex */
             regex: string;
         };
+        /** Attachment */
+        Attachment: {
+            /** Device */
+            device: string;
+            /** Interface */
+            interface: string;
+            /** Vid */
+            vid: number | null;
+        };
         /** BgpPeer */
         BgpPeer: {
             /** Vpn */
@@ -3542,6 +3551,89 @@ export interface components {
             /** Asn */
             asn: number;
         };
+        /** DeployJob */
+        DeployJob: {
+            /** Id */
+            id: number;
+            /** Kind */
+            kind: string;
+            /** Status */
+            status: string;
+            /** Site */
+            site: string | null;
+            /** Requested By */
+            requested_by: string | null;
+            /** Approved By */
+            approved_by: string | null;
+            /** Approved At */
+            approved_at: string | null;
+            /** Generators */
+            generators: string[] | null;
+            /** Created At */
+            created_at: string;
+            /** Finished At */
+            finished_at: string | null;
+            /** Error */
+            error: string | null;
+            /** Window Start */
+            window_start: string | null;
+            /** Window End */
+            window_end: string | null;
+            /** Checks */
+            checks: {
+                [key: string]: unknown;
+            } | null;
+            /** Params */
+            params: {
+                [key: string]: unknown;
+            } | null;
+            /** Steps */
+            steps: components["schemas"]["DeployStep"][];
+            /** Log */
+            log?: components["schemas"]["LogLine"][];
+        };
+        /** DeployStep */
+        DeployStep: {
+            /** Device */
+            device: string;
+            /** Status */
+            status: string;
+            /** Patch */
+            patch: string | null;
+            /** Error */
+            error: string | null;
+            /** Started At */
+            started_at: string | null;
+            /** Finished At */
+            finished_at: string | null;
+        };
+        /** Device */
+        Device: {
+            /** Name */
+            name: string;
+            /** Site */
+            site: string | null;
+            /** Role */
+            role: string | null;
+            /** Status */
+            status: string | null;
+            /** Primary Ip */
+            primary_ip: string | null;
+            /** Location */
+            location: string | null;
+            /** Rack */
+            rack: string | null;
+            /** Position */
+            position: number | null;
+            /** Face */
+            face: ("front" | "rear") | null;
+            /** Pinned */
+            pinned: boolean;
+            /** Meth Mac */
+            meth_mac: string | null;
+            /** Peer */
+            peer: string | null;
+        };
         /** DeviceRouting */
         DeviceRouting: {
             /** Prefix Lists */
@@ -3569,6 +3661,60 @@ export interface components {
             /** Ospf */
             ospf?: components["schemas"]["OspfProcess"][];
         };
+        /** DiffJob */
+        DiffJob: {
+            /** Id */
+            id: number;
+            /** Kind */
+            kind: string;
+            /** Requested By */
+            requested_by: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "running" | "done" | "failed";
+            /** Site */
+            site: string | null;
+            /** Created At */
+            created_at: string;
+            /** Finished At */
+            finished_at: string | null;
+            /** Error */
+            error: string | null;
+            /** Devices */
+            devices: number;
+            /** Changed */
+            changed: number;
+            /** Errors */
+            errors: number;
+            /** Snapshots */
+            snapshots?: components["schemas"]["DiffSnapshot"][];
+        };
+        /** DiffSnapshot */
+        DiffSnapshot: {
+            /** Device */
+            device: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "pending" | "ok" | "error";
+            /** Has Changes */
+            has_changes: boolean | null;
+            /** Diff */
+            diff: string | null;
+            /** Error */
+            error: string | null;
+            /** Created At */
+            created_at: string;
+            /** Finished At */
+            finished_at: string | null;
+            /** Job Id */
+            job_id: number;
+            /** Job Kind */
+            job_kind: string | null;
+        };
         /** DirectoryTest */
         DirectoryTest: {
             /** Username */
@@ -3576,10 +3722,75 @@ export interface components {
             /** Password */
             password: string;
         };
+        /** Drift */
+        Drift: {
+            scheduler: components["schemas"]["DriftScheduler"] | null;
+            /** Devices */
+            devices: components["schemas"]["DriftDevice"][];
+        };
+        /** DriftDevice */
+        DriftDevice: {
+            /** Device */
+            device: string;
+            /** Site */
+            site: string | null;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "in_sync" | "out_of_sync" | "error" | "unknown";
+            /** Checked At */
+            checked_at: string | null;
+            /** Job Id */
+            job_id: number | null;
+            /** Job Kind */
+            job_kind: string | null;
+            /** Diff */
+            diff: string | null;
+            /** Error */
+            error: string | null;
+        };
+        /** DriftScheduler */
+        DriftScheduler: {
+            /** Interval Seconds */
+            interval_seconds: number;
+            /** Last Started */
+            last_started: number | null;
+            /** Last Job Id */
+            last_job_id: number | null;
+            /** Last Skip */
+            last_skip: string | null;
+            /** Next Run */
+            next_run: number | null;
+        };
+        /** Fabric */
+        Fabric: {
+            /** Site */
+            site: string;
+            /** Name */
+            name: string;
+            /**
+             * Architecture
+             * @enum {string}
+             */
+            architecture: "symmetric" | "centralized";
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /** Health */
+        Health: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "error";
+            /** Netbox */
+            netbox: {
+                [key: string]: unknown;
+            };
         };
         /** ImportApproval */
         ImportApproval: {
@@ -3645,7 +3856,39 @@ export interface components {
              * Servers
              * @default []
              */
-            servers: components["schemas"]["RelayServer"][];
+            servers: components["schemas"]["RelayServer-Input"][];
+        };
+        /** JobId */
+        JobId: {
+            /** Id */
+            id: number;
+        };
+        /** LogLine */
+        LogLine: {
+            /** At */
+            at: string;
+            /** Device */
+            device: string | null;
+            /** Level */
+            level: string;
+            /** Message */
+            message: string;
+        };
+        /** Me */
+        Me: {
+            /** Username */
+            username: string;
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "viewer" | "operator" | "approver" | "admin";
+            /** Fabrics */
+            fabrics: {
+                [key: string]: boolean;
+            } | null;
+            /** Source */
+            source: string;
         };
         /** MicrosegContract */
         MicrosegContract: {
@@ -4066,22 +4309,42 @@ export interface components {
             /** Mark */
             mark?: string | null;
         };
+        /** Relay */
+        Relay: {
+            /** Servers */
+            servers: components["schemas"]["RelayServer-Output"][];
+            /** Loopback */
+            loopback: number;
+        } & {
+            [key: string]: unknown;
+        };
         /** RelayIntent */
         RelayIntent: {
             /**
              * Servers
              * @default []
              */
-            servers: components["schemas"]["RelayServer"][];
+            servers: components["schemas"]["RelayServer-Input"][];
         };
         /** RelayServer */
-        RelayServer: {
+        "RelayServer-Input": {
             /** Address */
             address: string;
             /** Service */
             service?: string | null;
             /** Segment */
             segment?: number | null;
+        };
+        /** RelayServer */
+        "RelayServer-Output": {
+            /** Address */
+            address: string;
+            /** Service */
+            service?: string;
+            /** Segment */
+            segment?: number;
+        } & {
+            [key: string]: unknown;
         };
         /** RoleChange */
         RoleChange: {
@@ -4094,6 +4357,17 @@ export interface components {
             device?: string | null;
             /** Expected */
             expected: number;
+        };
+        /** Routing */
+        Routing: {
+            /** Gateway */
+            gateway: string;
+            /** Peers */
+            peers: number[];
+            /** Firewall */
+            firewall: string | null;
+            relay?: components["schemas"]["Relay"];
+            ipv6?: components["schemas"]["SegmentIpv6"];
         };
         /** RoutingIntent */
         RoutingIntent: {
@@ -4115,13 +4389,72 @@ export interface components {
              */
             peers: number[];
         };
+        /** Segment */
+        Segment: {
+            /** Fabric */
+            fabric: string | null;
+            /** Name */
+            name: string;
+            /** Vni */
+            vni: number;
+            /** Bd Id */
+            bd_id: number | null;
+            routing: components["schemas"]["Routing"] | null;
+            /** Attachments */
+            attachments: components["schemas"]["Attachment"][];
+        };
+        /** SegmentIpv6 */
+        SegmentIpv6: {
+            /** Gateway */
+            gateway: string;
+            /**
+             * Hosts
+             * @enum {string}
+             */
+            hosts: "slaac" | "dhcpv6" | "none";
+            /** Servers */
+            servers: components["schemas"]["RelayServer-Output"][];
+        };
+        /** Service */
+        Service: {
+            /** Name */
+            name: string;
+            /** Vrf */
+            vrf: string;
+            /** Rd Vlan */
+            rd_vlan: number | null;
+            /** Device */
+            device: string | null;
+            /** Port */
+            port: string | null;
+            /** Vlan */
+            vlan: number | null;
+            /** Address */
+            address: string | null;
+            /** Next Hop */
+            next_hop: string | null;
+            /** Asn */
+            asn: number | null;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "firewall" | "isp";
+            /** Devices */
+            devices: (string | null)[];
+            /** Addresses */
+            addresses: {
+                [key: string]: string;
+            } | null;
+            ipv6: components["schemas"]["ServiceIpv6-Output"] | null;
+        };
         /** ServiceChange */
         ServiceChange: {
             /** Asn */
             asn: number | null;
         };
         /** ServiceIpv6 */
-        ServiceIpv6: {
+        "ServiceIpv6-Input": {
             /** Address */
             address: string;
             /** Next Hop */
@@ -4130,6 +4463,19 @@ export interface components {
             addresses?: {
                 [key: string]: string;
             } | null;
+        };
+        /** ServiceIpv6 */
+        "ServiceIpv6-Output": {
+            /** Address */
+            address: string;
+            /** Next Hop */
+            next_hop: string;
+            /** Addresses */
+            addresses?: {
+                [key: string]: string;
+            };
+        } & {
+            [key: string]: unknown;
         };
         /** SnmpPasswords */
         SnmpPasswords: {
@@ -4275,9 +4621,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["Health"];
                 };
             };
         };
@@ -4336,9 +4680,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    }[];
+                    "application/json": components["schemas"]["Device"][];
                 };
             };
             /** @description Validation Error */
@@ -4619,9 +4961,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    }[];
+                    "application/json": components["schemas"]["DiffJob"][];
                 };
             };
             /** @description Validation Error */
@@ -4656,9 +4996,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["JobId"];
                 };
             };
             /** @description Validation Error */
@@ -4691,9 +5029,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["DiffJob"];
                 };
             };
             /** @description Validation Error */
@@ -4726,9 +5062,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["DiffSnapshot"];
                 };
             };
             /** @description Validation Error */
@@ -4759,9 +5093,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["Drift"];
                 };
             };
             /** @description Validation Error */
@@ -4917,9 +5249,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["Me"];
                 };
             };
             /** @description Validation Error */
@@ -5476,9 +5806,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    }[];
+                    "application/json": components["schemas"]["DeployJob"][];
                 };
             };
             /** @description Validation Error */
@@ -5513,9 +5841,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["JobId"];
                 };
             };
             /** @description Validation Error */
@@ -5552,9 +5878,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["JobId"];
                 };
             };
             /** @description Validation Error */
@@ -5587,9 +5911,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["JobId"];
                 };
             };
             /** @description Validation Error */
@@ -5622,9 +5944,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["DeployJob"];
                 };
             };
             /** @description Validation Error */
@@ -6051,9 +6371,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    }[];
+                    "application/json": components["schemas"]["Segment"][];
                 };
             };
             /** @description Validation Error */
@@ -6423,9 +6741,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    }[];
+                    "application/json": components["schemas"]["Service"][];
                 };
             };
             /** @description Validation Error */
@@ -6566,7 +6882,7 @@ export interface operations {
         };
         requestBody?: {
             content: {
-                "application/json": components["schemas"]["ServiceIpv6"] | null;
+                "application/json": components["schemas"]["ServiceIpv6-Input"] | null;
             };
         };
         responses: {
@@ -6794,9 +7110,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    }[];
+                    "application/json": components["schemas"]["Fabric"][];
                 };
             };
             /** @description Validation Error */

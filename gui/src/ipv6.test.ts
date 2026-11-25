@@ -4,7 +4,7 @@ import { ipv6Places } from "./Ipv6";
 
 const seg = (name: string, vni: number, firewall: string | null, peers: number[], ipv6: boolean): Segment => ({
   fabric: "example", name, vni, bd_id: vni - 10000, attachments: [],
-  routing: { gateway: "10.100.0.1/24", peers, firewall, ipv6: ipv6 ? { gateway: "fd00:1::1/64", hosts: "slaac", servers: [] } : null },
+  routing: { gateway: "10.100.0.1/24", peers, firewall, ipv6: ipv6 ? { gateway: "fd00:1::1/64", hosts: "slaac", servers: [] } : undefined },
 });
 
 describe("where a DHCPv6 server may sit", () => {

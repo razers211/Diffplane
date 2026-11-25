@@ -14,11 +14,13 @@ from orchestrator.deps import (
     current_user, _drift_report, get_access, get_drift, get_jobs, get_netbox, LOGIN, OPERATE,
     _visible_devices,
 )
+from orchestrator.answers import DiffJob, DiffSnapshot, Drift, JobId
+
 
 router = APIRouter()
 
 
-@router.post("/diff-jobs", status_code=202, dependencies=[LOGIN, OPERATE])
+@router.post("/diff-jobs", status_code=202, dependencies=[LOGIN, OPERATE], response_model=JobId, response_model_exclude_unset=True)
 async def start_diff_job(
     site: str | None = Body(default=None),
     devices: list[str] | None = Body(default=None),
@@ -34,7 +36,7 @@ async def start_diff_job(
     return {"id": job_id}
 
 
-@router.get("/diff-jobs", dependencies=[LOGIN])
+@router.get("/diff-jobs", dependencies=[LOGIN], response_model=list[DiffJob], response_model_exclude_unset=True)
 async def list_diff_jobs(limit: int = 20, jobs: diff_jobs.DiffJobs = Depends(get_jobs),
                          access: Access = Depends(get_access), user: str = Depends(current_user)) -> list[dict]:
     found = await diff_jobs.list_jobs(jobs.sessions, min(max(limit, 1), 200))
@@ -43,7 +45,7 @@ async def list_diff_jobs(limit: int = 20, jobs: diff_jobs.DiffJobs = Depends(get
         if access.limited else found
 
 
-@router.get("/diff-jobs/{job_id}", dependencies=[LOGIN])
+@router.get("/diff-jobs/{job_id}", dependencies=[LOGIN], response_model=DiffJob, response_model_exclude_unset=True)
 async def get_diff_job(job_id: int, jobs: diff_jobs.DiffJobs = Depends(get_jobs),
                        access: Access = Depends(get_access), netbox: NetBoxClient = Depends(get_netbox)) -> dict:
     job = await diff_jobs.get_job(jobs.sessions, job_id)
@@ -57,7 +59,7 @@ async def get_diff_job(job_id: int, jobs: diff_jobs.DiffJobs = Depends(get_jobs)
     return job
 
 
-@router.get("/devices/{name}/diff", dependencies=[LOGIN])
+@router.get("/devices/{name}/diff", dependencies=[LOGIN], response_model=DiffSnapshot, response_model_exclude_unset=True)
 async def device_latest_diff(name: str, jobs: diff_jobs.DiffJobs = Depends(get_jobs),
 ) -> dict:
     """The device's most recent finished diff snapshot."""
@@ -67,7 +69,7 @@ async def device_latest_diff(name: str, jobs: diff_jobs.DiffJobs = Depends(get_j
     return snap
 
 
-@router.get("/drift", dependencies=[LOGIN])
+@router.get("/drift", dependencies=[LOGIN], response_model=Drift, response_model_exclude_unset=True)
 async def drift_status(
     jobs: diff_jobs.DiffJobs = Depends(get_jobs), netbox: NetBoxClient = Depends(get_netbox),
     scheduler: drift.DriftScheduler | None = Depends(get_drift), access: Access = Depends(get_access),

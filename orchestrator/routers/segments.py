@@ -11,11 +11,13 @@ from orchestrator.deps import (
     current_user, get_accounts, get_netbox, get_routing, get_segments, INTENT_WRITE, LOGIN,
     _segment_call,
 )
+from orchestrator.answers import Segment, Service
+
 
 router = APIRouter()
 
 
-@router.get("/segments", dependencies=[LOGIN])
+@router.get("/segments", dependencies=[LOGIN], response_model=list[Segment], response_model_exclude_unset=True)
 async def list_segments(site: str, segments: segs.Segments = Depends(get_segments)) -> list[dict]:
     """Segments of one fabric (site slug), plus unassigned ones from before fabrics."""
     try:
@@ -120,7 +122,7 @@ async def detach_segment(
 
 # -- routing: firewall services and routed segments ---------------------------------
 
-@router.get("/services", dependencies=[LOGIN])
+@router.get("/services", dependencies=[LOGIN], response_model=list[Service], response_model_exclude_unset=True)
 async def list_services(site: str, routing: rt.Routing = Depends(get_routing)) -> list[dict]:
     """Firewall services of one fabric; the first is the default for new routed segments."""
     try:

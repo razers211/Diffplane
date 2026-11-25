@@ -15,9 +15,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "type": "object",
-                  "title": "Response Health Health Get"
+                  "$ref": "#/components/schemas/Health"
                 }
               }
             }
@@ -130,8 +128,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "type": "object",
-                    "additionalProperties": true
+                    "$ref": "#/components/schemas/Device"
                   },
                   "title": "Response Devices Devices Get"
                 }
@@ -635,9 +632,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response Start Diff Job Diff Jobs Post"
+                  "$ref": "#/components/schemas/JobId"
                 }
               }
             }
@@ -693,8 +688,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "type": "object",
-                    "additionalProperties": true
+                    "$ref": "#/components/schemas/DiffJob"
                   },
                   "title": "Response List Diff Jobs Diff Jobs Get"
                 }
@@ -751,9 +745,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response Get Diff Job Diff Jobs  Job Id  Get"
+                  "$ref": "#/components/schemas/DiffJob"
                 }
               }
             }
@@ -809,9 +801,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response Device Latest Diff Devices  Name  Diff Get"
+                  "$ref": "#/components/schemas/DiffSnapshot"
                 }
               }
             }
@@ -858,9 +848,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response Drift Status Drift Get"
+                  "$ref": "#/components/schemas/Drift"
                 }
               }
             }
@@ -1054,9 +1042,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response Me Auth Me Get"
+                  "$ref": "#/components/schemas/Me"
                 }
               }
             }
@@ -1950,9 +1936,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response Request Deploy Deploy Jobs Post"
+                  "$ref": "#/components/schemas/JobId"
                 }
               }
             }
@@ -2008,8 +1992,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "type": "object",
-                    "additionalProperties": true
+                    "$ref": "#/components/schemas/DeployJob"
                   },
                   "title": "Response List Deploy Jobs Deploy Jobs Get"
                 }
@@ -2076,9 +2059,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response Approve Deploy Deploy Jobs  Job Id  Approve Post"
+                  "$ref": "#/components/schemas/JobId"
                 }
               }
             }
@@ -2134,9 +2115,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response Cancel Deploy Deploy Jobs  Job Id  Cancel Post"
+                  "$ref": "#/components/schemas/JobId"
                 }
               }
             }
@@ -2191,9 +2170,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response Get Deploy Job Deploy Jobs  Job Id  Get"
+                  "$ref": "#/components/schemas/DeployJob"
                 }
               }
             }
@@ -2927,8 +2904,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "type": "object",
-                    "additionalProperties": true
+                    "$ref": "#/components/schemas/Segment"
                   },
                   "title": "Response List Segments Segments Get"
                 }
@@ -3593,8 +3569,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "type": "object",
-                    "additionalProperties": true
+                    "$ref": "#/components/schemas/Service"
                   },
                   "title": "Response List Services Services Get"
                 }
@@ -3858,7 +3833,7 @@
               "schema": {
                 "anyOf": [
                   {
-                    "$ref": "#/components/schemas/ServiceIpv6"
+                    "$ref": "#/components/schemas/ServiceIpv6-Input"
                   },
                   {
                     "type": "null"
@@ -4292,8 +4267,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "type": "object",
-                    "additionalProperties": true
+                    "$ref": "#/components/schemas/Fabric"
                   },
                   "title": "Response List Fabrics Fabrics Get"
                 }
@@ -13229,6 +13203,37 @@
         ],
         "title": "AsPathRule"
       },
+      "Attachment": {
+        "properties": {
+          "device": {
+            "type": "string",
+            "title": "Device"
+          },
+          "interface": {
+            "type": "string",
+            "title": "Interface"
+          },
+          "vid": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vid"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "device",
+          "interface",
+          "vid"
+        ],
+        "title": "Attachment"
+      },
       "BgpPeer": {
         "properties": {
           "vpn": {
@@ -14028,6 +14033,397 @@
         ],
         "title": "DciUplink"
       },
+      "DeployJob": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "site": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Site"
+          },
+          "requested_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested By"
+          },
+          "approved_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approved By"
+          },
+          "approved_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approved At"
+          },
+          "generators": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Generators"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "window_start": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Window Start"
+          },
+          "window_end": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Window End"
+          },
+          "checks": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checks"
+          },
+          "params": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Params"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/DeployStep"
+            },
+            "type": "array",
+            "title": "Steps"
+          },
+          "log": {
+            "items": {
+              "$ref": "#/components/schemas/LogLine"
+            },
+            "type": "array",
+            "title": "Log"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "status",
+          "site",
+          "requested_by",
+          "approved_by",
+          "approved_at",
+          "generators",
+          "created_at",
+          "finished_at",
+          "error",
+          "window_start",
+          "window_end",
+          "checks",
+          "params",
+          "steps"
+        ],
+        "title": "DeployJob"
+      },
+      "DeployStep": {
+        "properties": {
+          "device": {
+            "type": "string",
+            "title": "Device"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "patch": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Patch"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "device",
+          "status",
+          "patch",
+          "error",
+          "started_at",
+          "finished_at"
+        ],
+        "title": "DeployStep"
+      },
+      "Device": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "site": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Site"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "primary_ip": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Primary Ip"
+          },
+          "location": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location"
+          },
+          "rack": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rack"
+          },
+          "position": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Position"
+          },
+          "face": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "front",
+                  "rear"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Face"
+          },
+          "pinned": {
+            "type": "boolean",
+            "title": "Pinned"
+          },
+          "meth_mac": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Meth Mac"
+          },
+          "peer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Peer"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "site",
+          "role",
+          "status",
+          "primary_ip",
+          "location",
+          "rack",
+          "position",
+          "face",
+          "pinned",
+          "meth_mac",
+          "peer"
+        ],
+        "title": "Device"
+      },
       "DeviceRouting": {
         "properties": {
           "prefix_lists": {
@@ -14103,6 +14499,204 @@
         "type": "object",
         "title": "DeviceRouting"
       },
+      "DiffJob": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "requested_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested By"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "running",
+              "done",
+              "failed"
+            ],
+            "title": "Status"
+          },
+          "site": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Site"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "devices": {
+            "type": "integer",
+            "title": "Devices"
+          },
+          "changed": {
+            "type": "integer",
+            "title": "Changed"
+          },
+          "errors": {
+            "type": "integer",
+            "title": "Errors"
+          },
+          "snapshots": {
+            "items": {
+              "$ref": "#/components/schemas/DiffSnapshot"
+            },
+            "type": "array",
+            "title": "Snapshots"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "requested_by",
+          "status",
+          "site",
+          "created_at",
+          "finished_at",
+          "error",
+          "devices",
+          "changed",
+          "errors"
+        ],
+        "title": "DiffJob"
+      },
+      "DiffSnapshot": {
+        "properties": {
+          "device": {
+            "type": "string",
+            "title": "Device"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "ok",
+              "error"
+            ],
+            "title": "Status"
+          },
+          "has_changes": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Has Changes"
+          },
+          "diff": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Diff"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "job_id": {
+            "type": "integer",
+            "title": "Job Id"
+          },
+          "job_kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Kind"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "device",
+          "status",
+          "has_changes",
+          "diff",
+          "error",
+          "created_at",
+          "finished_at",
+          "job_id",
+          "job_kind"
+        ],
+        "title": "DiffSnapshot"
+      },
       "DirectoryTest": {
         "properties": {
           "username": {
@@ -14121,6 +14715,221 @@
         ],
         "title": "DirectoryTest"
       },
+      "Drift": {
+        "properties": {
+          "scheduler": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DriftScheduler"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "devices": {
+            "items": {
+              "$ref": "#/components/schemas/DriftDevice"
+            },
+            "type": "array",
+            "title": "Devices"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "scheduler",
+          "devices"
+        ],
+        "title": "Drift"
+      },
+      "DriftDevice": {
+        "properties": {
+          "device": {
+            "type": "string",
+            "title": "Device"
+          },
+          "site": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Site"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "in_sync",
+              "out_of_sync",
+              "error",
+              "unknown"
+            ],
+            "title": "State"
+          },
+          "checked_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checked At"
+          },
+          "job_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Id"
+          },
+          "job_kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Kind"
+          },
+          "diff": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Diff"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "device",
+          "site",
+          "state",
+          "checked_at",
+          "job_id",
+          "job_kind",
+          "diff",
+          "error"
+        ],
+        "title": "DriftDevice"
+      },
+      "DriftScheduler": {
+        "properties": {
+          "interval_seconds": {
+            "type": "number",
+            "title": "Interval Seconds"
+          },
+          "last_started": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Started"
+          },
+          "last_job_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Job Id"
+          },
+          "last_skip": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Skip"
+          },
+          "next_run": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Run"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "interval_seconds",
+          "last_started",
+          "last_job_id",
+          "last_skip",
+          "next_run"
+        ],
+        "title": "DriftScheduler"
+      },
+      "Fabric": {
+        "properties": {
+          "site": {
+            "type": "string",
+            "title": "Site"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "architecture": {
+            "type": "string",
+            "enum": [
+              "symmetric",
+              "centralized"
+            ],
+            "title": "Architecture"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "site",
+          "name",
+          "architecture"
+        ],
+        "title": "Fabric"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -14133,6 +14942,30 @@
         },
         "type": "object",
         "title": "HTTPValidationError"
+      },
+      "Health": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "error"
+            ],
+            "title": "Status"
+          },
+          "netbox": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Netbox"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "status",
+          "netbox"
+        ],
+        "title": "Health"
       },
       "ImportApproval": {
         "properties": {
@@ -14286,7 +15119,7 @@
           },
           "servers": {
             "items": {
-              "$ref": "#/components/schemas/RelayServer"
+              "$ref": "#/components/schemas/RelayServer-Input"
             },
             "type": "array",
             "title": "Servers",
@@ -14298,6 +15131,101 @@
           "enabled"
         ],
         "title": "Ipv6Intent"
+      },
+      "JobId": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "title": "JobId"
+      },
+      "LogLine": {
+        "properties": {
+          "at": {
+            "type": "string",
+            "title": "At"
+          },
+          "device": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device"
+          },
+          "level": {
+            "type": "string",
+            "title": "Level"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "at",
+          "device",
+          "level",
+          "message"
+        ],
+        "title": "LogLine"
+      },
+      "Me": {
+        "properties": {
+          "username": {
+            "type": "string",
+            "title": "Username"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "viewer",
+              "operator",
+              "approver",
+              "admin"
+            ],
+            "title": "Role"
+          },
+          "fabrics": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "boolean"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fabrics"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "username",
+          "role",
+          "fabrics",
+          "source"
+        ],
+        "title": "Me"
       },
       "MicrosegContract": {
         "properties": {
@@ -15348,11 +16276,33 @@
         ],
         "title": "QosPortMark"
       },
+      "Relay": {
+        "properties": {
+          "servers": {
+            "items": {
+              "$ref": "#/components/schemas/RelayServer-Output"
+            },
+            "type": "array",
+            "title": "Servers"
+          },
+          "loopback": {
+            "type": "integer",
+            "title": "Loopback"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "servers",
+          "loopback"
+        ],
+        "title": "Relay"
+      },
       "RelayIntent": {
         "properties": {
           "servers": {
             "items": {
-              "$ref": "#/components/schemas/RelayServer"
+              "$ref": "#/components/schemas/RelayServer-Input"
             },
             "type": "array",
             "title": "Servers",
@@ -15362,7 +16312,7 @@
         "type": "object",
         "title": "RelayIntent"
       },
-      "RelayServer": {
+      "RelayServer-Input": {
         "properties": {
           "address": {
             "type": "string",
@@ -15391,6 +16341,28 @@
             "title": "Segment"
           }
         },
+        "type": "object",
+        "required": [
+          "address"
+        ],
+        "title": "RelayServer"
+      },
+      "RelayServer-Output": {
+        "properties": {
+          "address": {
+            "type": "string",
+            "title": "Address"
+          },
+          "service": {
+            "type": "string",
+            "title": "Service"
+          },
+          "segment": {
+            "type": "integer",
+            "title": "Segment"
+          }
+        },
+        "additionalProperties": true,
         "type": "object",
         "required": [
           "address"
@@ -15434,6 +16406,46 @@
         ],
         "title": "RollbackRequest"
       },
+      "Routing": {
+        "properties": {
+          "gateway": {
+            "type": "string",
+            "title": "Gateway"
+          },
+          "peers": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Peers"
+          },
+          "firewall": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Firewall"
+          },
+          "relay": {
+            "$ref": "#/components/schemas/Relay"
+          },
+          "ipv6": {
+            "$ref": "#/components/schemas/SegmentIpv6"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "gateway",
+          "peers",
+          "firewall"
+        ],
+        "title": "Routing"
+      },
       "RoutingIntent": {
         "properties": {
           "routed": {
@@ -15472,6 +16484,253 @@
         ],
         "title": "RoutingIntent"
       },
+      "Segment": {
+        "properties": {
+          "fabric": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fabric"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "vni": {
+            "type": "integer",
+            "title": "Vni"
+          },
+          "bd_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bd Id"
+          },
+          "routing": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Routing"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "attachments": {
+            "items": {
+              "$ref": "#/components/schemas/Attachment"
+            },
+            "type": "array",
+            "title": "Attachments"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "fabric",
+          "name",
+          "vni",
+          "bd_id",
+          "routing",
+          "attachments"
+        ],
+        "title": "Segment"
+      },
+      "SegmentIpv6": {
+        "properties": {
+          "gateway": {
+            "type": "string",
+            "title": "Gateway"
+          },
+          "hosts": {
+            "type": "string",
+            "enum": [
+              "slaac",
+              "dhcpv6",
+              "none"
+            ],
+            "title": "Hosts"
+          },
+          "servers": {
+            "items": {
+              "$ref": "#/components/schemas/RelayServer-Output"
+            },
+            "type": "array",
+            "title": "Servers"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "gateway",
+          "hosts",
+          "servers"
+        ],
+        "title": "SegmentIpv6"
+      },
+      "Service": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "vrf": {
+            "type": "string",
+            "title": "Vrf"
+          },
+          "rd_vlan": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rd Vlan"
+          },
+          "device": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device"
+          },
+          "port": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Port"
+          },
+          "vlan": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vlan"
+          },
+          "address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address"
+          },
+          "next_hop": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Hop"
+          },
+          "asn": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Asn"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "firewall",
+              "isp"
+            ],
+            "title": "Kind"
+          },
+          "devices": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Devices"
+          },
+          "addresses": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Addresses"
+          },
+          "ipv6": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ServiceIpv6-Output"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "vrf",
+          "rd_vlan",
+          "device",
+          "port",
+          "vlan",
+          "address",
+          "next_hop",
+          "asn",
+          "kind",
+          "devices",
+          "addresses",
+          "ipv6"
+        ],
+        "title": "Service"
+      },
       "ServiceChange": {
         "properties": {
           "asn": {
@@ -15492,7 +16751,7 @@
         ],
         "title": "ServiceChange"
       },
-      "ServiceIpv6": {
+      "ServiceIpv6-Input": {
         "properties": {
           "address": {
             "type": "string",
@@ -15517,6 +16776,32 @@
             "title": "Addresses"
           }
         },
+        "type": "object",
+        "required": [
+          "address",
+          "next_hop"
+        ],
+        "title": "ServiceIpv6"
+      },
+      "ServiceIpv6-Output": {
+        "properties": {
+          "address": {
+            "type": "string",
+            "title": "Address"
+          },
+          "next_hop": {
+            "type": "string",
+            "title": "Next Hop"
+          },
+          "addresses": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Addresses"
+          }
+        },
+        "additionalProperties": true,
         "type": "object",
         "required": [
           "address",

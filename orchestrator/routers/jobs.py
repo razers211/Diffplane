@@ -15,13 +15,15 @@ from orchestrator.deps import (
     current_user, _deploy_approval, get_access, get_accounts, get_deploys, get_drafts, get_netbox,
     get_upgrades, LOGIN, OPERATE, _resolved, _visible_devices,
 )
+from orchestrator.answers import DeployJob, JobId
+
 
 router = APIRouter()
 
 
 # -- deploys ----------------------------------------------------------------------------
 
-@router.post("/deploy-jobs", status_code=202, dependencies=[LOGIN, OPERATE])
+@router.post("/deploy-jobs", status_code=202, dependencies=[LOGIN, OPERATE], response_model=JobId, response_model_exclude_unset=True)
 async def request_deploy(
     user: str = Depends(current_user),
     site: str | None = Body(default=None),
@@ -44,7 +46,7 @@ def _window(window_start: datetime | None, window_end: datetime | None) -> tuple
     return (window_start, window_end) if window_start else None
 
 
-@router.post("/deploy-jobs/{job_id}/approve", dependencies=[LOGIN, OPERATE, Depends(_deploy_approval)])
+@router.post("/deploy-jobs/{job_id}/approve", dependencies=[LOGIN, OPERATE, Depends(_deploy_approval)], response_model=JobId, response_model_exclude_unset=True)
 async def approve_deploy(
     job_id: int, user: str = Depends(current_user), jobs: deploys.DeployJobs = Depends(get_deploys),
     window_start: datetime | None = Body(default=None), window_end: datetime | None = Body(default=None),
@@ -68,7 +70,7 @@ async def _cancel_right(job_id: int, request: Request, user: str = Depends(curre
         raise HTTPException(status_code=403, detail="only who requested it or an approver may cancel this job")
 
 
-@router.post("/deploy-jobs/{job_id}/cancel", dependencies=[LOGIN, OPERATE, Depends(_cancel_right)])
+@router.post("/deploy-jobs/{job_id}/cancel", dependencies=[LOGIN, OPERATE, Depends(_cancel_right)], response_model=JobId, response_model_exclude_unset=True)
 async def cancel_deploy(
     job_id: int, user: str = Depends(current_user), jobs: deploys.DeployJobs = Depends(get_deploys)
 ) -> dict:
@@ -80,14 +82,14 @@ async def cancel_deploy(
     return {"id": job_id}
 
 
-@router.get("/deploy-jobs", dependencies=[LOGIN])
+@router.get("/deploy-jobs", dependencies=[LOGIN], response_model=list[DeployJob], response_model_exclude_unset=True)
 async def list_deploy_jobs(
     limit: int = 20, jobs: deploys.DeployJobs = Depends(get_deploys), access: Access = Depends(get_access)
 ) -> list[dict]:
     return [j for j in await deploys.list_deploys(jobs.sessions, min(max(limit, 1), 200)) if access.sees(j["site"])]
 
 
-@router.get("/deploy-jobs/{job_id}", dependencies=[LOGIN])
+@router.get("/deploy-jobs/{job_id}", dependencies=[LOGIN], response_model=DeployJob, response_model_exclude_unset=True)
 async def get_deploy_job(
     job_id: int, jobs: deploys.DeployJobs = Depends(get_deploys)
 ) -> dict:

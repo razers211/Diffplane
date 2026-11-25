@@ -2,12 +2,12 @@ import { describe, expect, it } from "vitest";
 import type { DeployJob, Device, DriftDevice, Topology } from "./api";
 import { deployTone, load, portSpeed, summarize } from "./overview";
 
-const dev = (name: string, status = "active", site = "example"): Device => ({ name, site, role: "leaf", status, primary_ip: null, location: null, rack: null, position: null, face: null, pinned: false });
+const dev = (name: string, status = "active", site = "example"): Device => ({ name, site, role: "leaf", status, primary_ip: null, location: null, rack: null, position: null, face: null, pinned: false, meth_mac: null, peer: null });
 const drift = (device: string, state: DriftDevice["state"]): DriftDevice => ({
   device, site: "example", state, checked_at: null, job_id: null, job_kind: null, diff: null, error: state === "error" ? "timeout" : null,
 });
 const job = (id: number, status: DeployJob["status"], site: string | null = "example"): DeployJob => ({
-  id, status, site, requested_by: "ops", approved_by: null, approved_at: null, generators: null,
+  id, kind: "deploy", status, site, requested_by: "ops", approved_by: null, window_start: null, window_end: null, approved_at: null, generators: null,
   created_at: "", finished_at: null, error: null,
   steps: [{ device: "leaf1", status: status === "diffed" ? "diffed" : "verified", patch: null, error: null, started_at: null, finished_at: null }],
 });

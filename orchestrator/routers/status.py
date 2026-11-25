@@ -15,11 +15,13 @@ from orchestrator import topology
 from orchestrator.deps import (
     COLLECTED_MAX_AGE, get_access, get_annet, get_netbox, get_prometheus, LOGIN, _slug,
 )
+from orchestrator.answers import Device, Health
+
 
 router = APIRouter()
 
 
-@router.get("/health")
+@router.get("/health", response_model=Health, response_model_exclude_unset=True)
 async def health(response: Response, netbox: NetBoxClient = Depends(get_netbox)) -> dict:
     try:
         status = await netbox.status()
@@ -68,7 +70,7 @@ async def device_config(
     return {"device": name, "config": redact(config)}
 
 
-@router.get("/devices", dependencies=[LOGIN])
+@router.get("/devices", dependencies=[LOGIN], response_model=list[Device], response_model_exclude_unset=True)
 async def devices(site: str | None = None, netbox: NetBoxClient = Depends(get_netbox),
                   access: Access = Depends(get_access)) -> list[dict]:
     """Devices from NetBox, optionally for one fabric (site slug)."""

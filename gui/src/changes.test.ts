@@ -5,7 +5,7 @@ import { barText, intentChanges, isIntentWrite, pending } from "./changes";
 const dev = (device: string, state: DriftDevice["state"], site = "example"): DriftDevice =>
   ({ device, site, state, checked_at: null, job_id: 1, job_kind: "diff", diff: state === "out_of_sync" ? "+x" : "", error: null });
 const job = (id: number, status: DeployJob["status"], site: string | null = "example", finished_at: string | null = null): DeployJob =>
-  ({ id, status, site, requested_by: "op", approved_by: null, approved_at: null, generators: null,
+  ({ id, kind: "deploy", status, site, requested_by: "op", approved_by: null, window_start: null, window_end: null, approved_at: null, generators: null,
      created_at: "2026-10-11T10:00:00Z", finished_at, error: null, steps: [] });
 
 group("pending changes", () => {
