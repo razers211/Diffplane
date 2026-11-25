@@ -7,7 +7,7 @@
 set -eu
 
 cd "$(dirname "$0")/.."
-IMAGE="${IMAGE:-ghcr.io/razers211/diffplane-orchestrator:${DIFFPLANE_VERSION:-v0.2.0}}"
+IMAGE="${IMAGE:-ghcr.io/razers211/diffplane-orchestrator:${DIFFPLANE_VERSION:-v0.2.1}}"
 
 if ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
   echo "Image $IMAGE not found: pull or build it first with  (cd deploy && docker compose pull orchestrator)  or  (... build orchestrator)" >&2

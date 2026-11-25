@@ -3,6 +3,16 @@
 Each release's images are on ghcr.io (`diffplane-orchestrator`, `diffplane-ztp`), built for
 amd64 and arm64 and signed; `deploy/compose.yaml` pulls the release it names.
 
+## v0.2.1 (2026-11-25)
+
+Security fixes found by code scanning:
+- `/health` (no login needed) no longer returns NetBox's error text; the details go to the log.
+- Masking switch cipher text in API answers runs in one pass (the old pattern could be made
+  very slow by a crafted line).
+- `deploy/.env` and the collector's login file are created readable by their owner only,
+  instead of being restricted just after they are written.
+- Port names are matched with a bounded pattern.
+
 ## v0.2.0 (2026-11-25)
 
 - **Command line:** `diffplane` (`client/diffplane.py`, `pip install ./client`), one file with

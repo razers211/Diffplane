@@ -37,7 +37,7 @@ that release tag; on a later commit, or to run code you changed, use `docker com
 to build them here instead (takes a while). To check an image's signature first:
 
 ```sh
-cosign verify ghcr.io/razers211/diffplane-orchestrator:v0.2.0 \
+cosign verify ghcr.io/razers211/diffplane-orchestrator:v0.2.1 \
   --certificate-identity-regexp '^https://github.com/razers211/Diffplane/' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
 ```
