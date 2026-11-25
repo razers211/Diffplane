@@ -3,7 +3,7 @@ from typing import Any
 
 from annet.generators import PartialGenerator
 
-from generators.fabric import FABRIC_ROLES, centralized, has_vtep, MissingFabricSettings, device_value, fabric_links, fabric_value, fabric_settings, ipv4_regex, is_leaf, loopback, related
+from generators.fabric import own_loopback, FABRIC_ROLES, centralized, has_vtep, MissingFabricSettings, device_value, fabric_links, fabric_value, fabric_settings, ipv4_regex, is_leaf, related
 
 
 def fabric_asn(device: Any) -> int:
@@ -24,7 +24,7 @@ def evpn_peers(storage: Any, device: Any) -> list[tuple[str, str]]:
         peer = devices.get(name)
         if peer is None or peer.role.slug not in FABRIC_ROLES:
             continue
-        address = loopback(peer, "LoopBack0")
+        address = own_loopback(peer)
         if address is not None:
             peers.append((name, str(address.ip)))
     return peers
@@ -72,7 +72,7 @@ class BgpEvpn(PartialGenerator):
         )
 
     def run_huawei(self, device: Any) -> Iterator[str | tuple[str, ...]]:
-        router_id = loopback(device, "LoopBack0")
+        router_id = own_loopback(device)
         peers = self._peers(device)
         if router_id is None or not peers:
             return

@@ -5,7 +5,7 @@ from typing import Any
 from annet.generators import PartialGenerator
 
 from generators.bgp_evpn import evpn_peers, fabric_asn
-from generators.fabric import FABRIC_ROLES, loopback, vtep_loopback
+from generators.fabric import own_loopback, FABRIC_ROLES, loopback, vtep_loopback
 
 
 def document(device: Any) -> dict:
@@ -90,7 +90,7 @@ class Dci(PartialGenerator):
         return [f"{indent}network {a} 255.255.255.255" for a in self._advertised(device)]
 
     def _advertised(self, device: Any) -> list[str]:
-        own = loopback(device, "LoopBack0")
+        own = own_loopback(device)
         vtep = loopback(device, vtep_loopback(device))
         return [str(a.ip) for a in (own, vtep) if a is not None]
 

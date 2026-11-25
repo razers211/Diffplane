@@ -9,6 +9,8 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
+from generators import naming
+
 LEAF_ROLES = ("leaf", "border-leaf")
 # Fabric links run between fabric devices only.
 FABRIC_ROLES = ("spine", *LEAF_ROLES)
@@ -75,6 +77,11 @@ def loopback(device: Any, name: str) -> ipaddress.IPv4Interface | None:
     return ipaddress.IPv4Interface(iface.ip_addresses[0].address)
 
 
+def own_loopback(device: Any) -> ipaddress.IPv4Interface | None:
+    """The switch's own loopback address (router ID, BGP source): LoopBack0 / Loopback0."""
+    return loopback(device, naming.loopback(naming.vendor_of(device), 0))
+
+
 def fabric_links(device: Any) -> list[FabricLink]:
     """Routed point-to-point links: cabled physical ports with an address (or tagged unnumbered),
     not in a LAG; and an Eth-Trunk tagged unnumbered whose members are cabled, its peer the far end of its first member's cable."""
@@ -92,7 +99,7 @@ def fabric_links(device: Any) -> list[FabricLink]:
             continue
         if iface.lag is not None or not (iface.ip_addresses or unnumbered) or not iface.connected_endpoints:
             continue
-        if iface.type.value in ("lag", "virtual") or iface.name.startswith("MEth"):
+        if iface.type.value in ("lag", "virtual") or naming.is_management(iface.name):
             continue
         peer = iface.connected_endpoints[0]
         if peer.device is None:
@@ -162,7 +169,7 @@ def all_trunks(device: Any) -> list[Trunk]:
         if iface.type.value != "lag":
             continue
         members = tuple(sorted(i.name for i in device.interfaces if i.lag is not None and i.lag.name == iface.name))
-        trunks.append(Trunk(name=iface.name, number=int(iface.name.removeprefix("Eth-Trunk")), members=members))
+        trunks.append(Trunk(name=iface.name, number=naming.trunk_number(iface.name), members=members))
     return sorted(trunks, key=lambda t: t.number)
 
 
@@ -194,7 +201,7 @@ def single_trunks(device: Any) -> list[Trunk]:
 def retired_trunks(device: Any) -> list[Trunk]:
     """Eth-Trunks deleted from NetBox, with their members, still to be removed from this device."""
     found = (routing_document(device).get("retired_trunks") or {}).get(device.name) or {}
-    return sorted((Trunk(name=n, number=int(n.removeprefix("Eth-Trunk")), members=tuple(sorted(m)))
+    return sorted((Trunk(name=n, number=naming.trunk_number(n), members=tuple(sorted(m)))
                    for n, m in found.items()), key=lambda t: t.number)
 
 
@@ -575,12 +582,12 @@ def pip_layout(device: Any) -> bool:
 
 
 def vtep_loopback(device: Any) -> str:
-    return "LoopBack2" if pip_layout(device) else "LoopBack1"
+    return naming.loopback(naming.vendor_of(device), 2 if pip_layout(device) else 1)
 
 
 def pip_loopback(device: Any) -> str:
     """Where `pip-source` and the bypass route take the PIP from (the pair has one layout)."""
-    return "LoopBack1" if pip_layout(device) else "LoopBack0"
+    return naming.loopback(naming.vendor_of(device), 1 if pip_layout(device) else 0)
 
 
 def has_vtep(device: Any) -> bool:

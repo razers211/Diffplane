@@ -4,7 +4,7 @@ from typing import Any
 
 from annet.generators import PartialGenerator
 
-from generators.fabric import (description, device_value, dfs_priority, fabric_value, has_overlay, loopback, mlag_peer_name,
+from generators.fabric import (own_loopback, description, device_value, dfs_priority, fabric_value, has_overlay, mlag_peer_name,
                                mlag_trunks, peer_link, related, trunk_description)
 
 DFS_GROUP = 1
@@ -53,8 +53,8 @@ class Mlag(PartialGenerator):
         password = os.environ.get(SECRET_ENV)
         if keyed and not password:
             raise MissingDfsPassword(f"{SECRET_ENV} is not set; it is required for M-LAG leaves")
-        own = loopback(device, "LoopBack0")
-        peer = loopback(related(self.storage, [peer_name])[peer_name], "LoopBack0")
+        own = own_loopback(device)
+        peer = own_loopback(related(self.storage, [peer_name])[peer_name])
         # imported fabrics: the heartbeat over MEth in _management_vpn_, adopted as the switches have it
         heartbeat = device_value(device, "heartbeat", None)
 

@@ -4,8 +4,8 @@ from typing import Any
 from annet.generators import PartialGenerator
 
 from generators.bgp_evpn import fabric_asn
-from generators.fabric import (MANAGED_VPN, centralized, in_segment, service_scheme, managed_vpn, has_overlay, local_services,
-                               loopback, routed_segments, tenant_vrfs)
+from generators.fabric import (own_loopback, MANAGED_VPN, centralized, in_segment, service_scheme, managed_vpn, has_overlay, local_services,
+                               routed_segments, tenant_vrfs)
 
 
 class TenantVrfs(PartialGenerator):
@@ -33,7 +33,7 @@ class TenantVrfs(PartialGenerator):
         segments, services = tenant_vrfs(device), local_services(device)
         if not segments and not services:
             return
-        router_id = loopback(device, "LoopBack0").ip
+        router_id = own_loopback(device).ip
         asn = fabric_asn(device)
         routed = routed_segments(device)
         for segment in segments:

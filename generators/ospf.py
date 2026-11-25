@@ -3,7 +3,7 @@ from typing import Any
 
 from annet.generators import PartialGenerator
 
-from generators.fabric import fabric_links, fabric_value, loopback, pip_layout
+from generators.fabric import own_loopback, fabric_links, fabric_value, loopback, pip_layout
 from generators.loopbacks import owned_loopbacks
 from generators.ospf_auth import KEYCHAIN, ospf_auth
 
@@ -34,7 +34,7 @@ class Ospf(PartialGenerator):
         )
 
     def run_huawei(self, device: Any) -> Iterator[str | tuple[str, ...]]:
-        router_id = loopback(device, "LoopBack0")
+        router_id = own_loopback(device)
         if router_id is None:
             return
         process = fabric_value(device, "ospf_process", PROCESS)

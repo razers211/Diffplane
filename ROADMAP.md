@@ -82,6 +82,29 @@ for users.
    real fabric (its cost grows with each switch), the flow aggregator and syslog receiver under
    real traffic.
 
+## Second vendor: Arista EOS
+
+Chosen after the [design note](docs/design/second-vendor.md): Arista EOS first, the first-version
+scope listed there, a fabric is one vendor. Steps, in order, each with the full test suite passing
+and every Huawei golden unchanged:
+
+1. **Interface names per vendor.** NetBox keeps each switch's own interface names (EOS:
+   `Loopback0`, `Port-Channel<n>`, `Ethernet<n>`, `Management1`, `Vxlan1`, `Vlan<n>`). One
+   module (`generators/naming.py`) builds and parses them per vendor, and the generators, the
+   seed, the fabric builder and the orchestrator ask it instead of writing VRP names.
+2. **Vendor per fabric.** A fabric setting (`huawei` by default), the switch models offered
+   limited to it, a port layout for vEOS-lab; Annet takes a model named `Arista ...` as EOS.
+3. **Arista generators and goldens** for the first-version scope: underlay, EVPN with spines as
+   route reflectors, MLAG pairs with a shared VTEP, segments (VLAN-to-VNI) on ports and
+   port-channels, anycast gateways in one VRF per routed segment, NTP, SNMP, syslog.
+4. **Our rules on Annet's Arista rulebook**, each with a patch test (undo forms, order).
+5. **Deploys:** EOS config sessions; verification as today (empty diff, a fresh poll, links up).
+6. **Collector over gNMI/OpenConfig** for interface state, counters and LLDP.
+7. **EVE-NG lab** (2 spines, 2 MLAG pairs, 2 hosts on vEOS-lab): each form checked on the console,
+   then deploys and removals with an empty diff, and traffic between the pairs.
+
+Until step 7, every EOS form is written from Arista's documentation and marked unverified.
+
 ## Ideas
 
 - Speed and negotiation lists (`speed auto <list>`) on copper ports.
