@@ -270,7 +270,9 @@ export function RoutingTargetPage({ site, target }: { site: string; target: stri
     }
   };
   const props: SectionProps = { routing, vpns, save, edit };
-  const ispVpns = (services.data ?? []).filter((v) => v.kind === "isp" && vpns.includes(v.name)).map((v) => v.name);
+  // An ISP service's instance: its own, or a shared one (a second ISP link joining another's).
+  const ispVpns = [...new Set((services.data ?? []).filter((v) => v.kind === "isp").map((v) => v.vrf ?? v.name))]
+    .filter((v) => vpns.includes(v));
 
   return (
     <div className="page">
