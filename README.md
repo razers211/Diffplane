@@ -18,8 +18,9 @@ git clone https://github.com/razers211/Diffplane.git && cd Diffplane
 scripts/demo.sh
 ```
 
-You need Docker with Compose v2 and Python 3. The script builds and starts the stack, loads two
-example fabrics and prints a sign-in. Open <https://127.0.0.1:8000/> (a self-signed certificate:
+You need Docker with Compose v2 and Python 3. The script pulls and starts the stack, loads two
+example fabrics and prints a sign-in. The first run takes about 18 minutes (the images download
+and NetBox sets up its database); later starts are much quicker. Open <https://127.0.0.1:8000/> (a self-signed certificate:
 the script prints its fingerprint). Nothing in the demo talks to a switch: every example switch
 is planned, and deploys are off.
 
