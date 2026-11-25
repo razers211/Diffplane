@@ -298,3 +298,12 @@ def test_ipv6_comes_back_after_routing_and_before_relay():
     result = plan(now, then, Scope(peers=PEERS))
     assert [k for k, _ in kinds(result)] == ["route", "ipv6", "relay"]
     assert result["operations"][1]["servers"] == [{"address": "fd00:1::53"}]
+
+
+def test_a_segment_that_goes_leaves_its_firewall_before_the_service_goes():
+    """The orchestrator refuses deleting a service that is still a segment's firewall."""
+    routed = {"gateway": "10.100.0.1/24", "peers": [], "firewall": "FW"}
+    now = intent(segments=[seg("web", 10500, 500, routed)], services=[FW])
+    result = plan(now, intent(), Scope(peers=PEERS))
+    assert [k for k, _ in kinds(result)] == ["route", "delete_service", "unroute", "delete_segment"]
+    assert result["operations"][0]["firewall"] is None

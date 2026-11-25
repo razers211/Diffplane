@@ -161,7 +161,8 @@ def plan(current: dict, snapshot: dict, scope: Scope) -> dict:
     moved: dict[int, dict] = {}   # segments taken off a service that goes: vni -> their routing now
     for vni, segment in sorted(cur_segs.items()):
         routing = segment["routing"]
-        if routing and routing.get("firewall") in delete_services and vni not in remove_segments:
+        # (also a segment that goes: the service is deleted before step 5 unroutes it)
+        if routing and routing.get("firewall") in delete_services:
             moved[vni] = routing
             ops.append(op("route", f"segment {segment['name']}: no firewall for now (its service is replaced)",
                           vni=vni, firewall=None, peers=routing.get("peers") or [], subnet=None))
