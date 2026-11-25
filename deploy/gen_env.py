@@ -6,6 +6,7 @@
 """
 
 import base64
+import os
 import secrets
 import sys
 from pathlib import Path
@@ -64,8 +65,10 @@ def main() -> int:
     text = target.read_text() if target.exists() else render((HERE / ".env.example").read_text())
     if ha:
         text = add_ha(text)
-    target.write_text(text)
-    target.chmod(0o600)
+    fd = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)   # never readable by others, even briefly
+    os.fchmod(fd, 0o600)   # an existing file (--ha) keeps its mode otherwise
+    with os.fdopen(fd, "w") as out:
+        out.write(text)
     print(f"wrote {target}" + (" with the HA secrets: copy this same file to the other two machines" if ha else ""))
     return 0
 

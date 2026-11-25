@@ -1,6 +1,7 @@
 """Health, switch lists and pages, topology, overview, traffic, control plane, hardware."""
 
 import asyncio
+import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Response
 
@@ -19,15 +20,17 @@ from orchestrator.answers import Device, Health
 
 
 router = APIRouter()
+log = logging.getLogger(__name__)
 
 
 @router.get("/health", response_model=Health, response_model_exclude_unset=True)
 async def health(response: Response, netbox: NetBoxClient = Depends(get_netbox)) -> dict:
     try:
         status = await netbox.status()
-    except NetBoxError as exc:
+    except NetBoxError as exc:   # /health needs no login: the details go to the log only
+        log.warning("health: %s", exc)
         response.status_code = 503
-        return {"status": "error", "netbox": {"ok": False, "error": str(exc)}}
+        return {"status": "error", "netbox": {"ok": False, "error": "NetBox is unreachable or refused the request"}}
 
     if status.minor_version not in ANNET_SUPPORTED_MINOR_VERSIONS:
         response.status_code = 503

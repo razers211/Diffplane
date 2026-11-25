@@ -16,7 +16,7 @@ _PORT_TYPES = {
     "100GE": "100gbase-x-qsfp28",
     "400GE": "400gbase-x-qsfpdd",
 }
-_PORT_RE = re.compile(r"(\d*GE)\d+/\d+/\d+")
+_PORT_RE = re.compile(r"(\d{0,3}GE)\d+/\d+/\d+")
 
 LEAF_ROLES = ("leaf", "border-leaf")
 # Fabric-wide: distributed anycast gateways on the leaves, or one

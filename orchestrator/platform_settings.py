@@ -219,8 +219,9 @@ class PlatformSettings:
         path = self.shared / "collector.json"
         login, password = self.env.get("COLLECTOR_LOGIN"), self.env.get("COLLECTOR_PASSWORD")
         tmp = path.with_suffix(".tmp")
-        tmp.write_text(json.dumps({"login": login, "password": password}))
-        tmp.chmod(0o600)
+        tmp.unlink(missing_ok=True)
+        with os.fdopen(os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), "w") as out:
+            out.write(json.dumps({"login": login, "password": password}))
         tmp.replace(path)
 
     def rows(self, group: str | None = None) -> list[dict]:
