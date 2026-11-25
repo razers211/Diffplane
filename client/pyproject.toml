@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=84.2.1"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "diffplane-client"
+version = "0.1.0"
+description = "Command-line client for the Diffplane orchestrator API (standard library only)"
+license = "Apache-2.0"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.scripts]
+diffplane = "diffplane:main"
+
+[tool.setuptools]
+py-modules = ["diffplane"]
