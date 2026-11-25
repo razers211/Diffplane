@@ -12,13 +12,11 @@ the seed creates devices as planned and never writes either.
 """
 
 import ipaddress
-import re
 
 from orchestrator.hostkeys import FIELD as PINS
 from orchestrator.netbox import NetBoxClient
 from orchestrator.segments import SegmentError
-
-MGMT = re.compile(r"MEth\d+/\d+/\d+$")
+from generators import naming
 
 
 def _status(device: dict) -> str | None:
@@ -42,8 +40,8 @@ class Lifecycle:
 
     async def activate(self, name: str, address: str, interface: str = "MEth0/0/0", allow_ztp: bool = False) -> dict:
         """Give a device its management address and make it active (or change the address)."""
-        if not MGMT.match(interface):
-            raise SegmentError(f"the management interface is a MEth port, not {interface!r}")
+        if not naming.is_management(interface):
+            raise SegmentError(f"{interface!r} is not a management port (MEth0/0/0, Management1)")
         try:
             iface_addr = ipaddress.IPv4Interface(address)
         except ValueError as exc:
@@ -66,7 +64,7 @@ class Lifecycle:
         if iface is None:
             iface = await self.nb.create("dcim/interfaces", {"device": device["id"], "name": interface,
                                                              "type": "1000base-t", "mgmt_only": True})
-        current = [ip for i in ifaces if MGMT.match(i["name"])
+        current = [ip for i in ifaces if naming.is_management(i["name"])
                    for ip in await self.nb.find("ipam/ip-addresses", interface_id=i["id"])]
         ip = next((c for c in current if _id(c.get("assigned_object_id")) == iface["id"]), None)
         if ip is None:
@@ -99,7 +97,7 @@ class Lifecycle:
                                                             "custom_fields": {PINS: None}})
         freed = []
         for iface in await self.nb.find("dcim/interfaces", device_id=device["id"]):
-            if MGMT.match(iface["name"]):
+            if naming.is_management(iface["name"]):
                 for ip in await self.nb.find("ipam/ip-addresses", interface_id=iface["id"]):
                     await self.nb.delete("ipam/ip-addresses", ip["id"])
                     freed.append(ip["address"])

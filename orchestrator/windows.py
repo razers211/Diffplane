@@ -15,6 +15,7 @@ import re
 from collections import Counter
 from datetime import datetime, time, timedelta
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+from generators import naming
 
 # Top-level blocks the window never changes beyond its approved lines: routing and management.
 GUARDED_BLOCKS = re.compile(
@@ -61,7 +62,7 @@ def safe_difference(approved: str, new: str, guarded_ports: set[str]) -> str | N
         if GUARDED_BLOCKS.match(path[0]):
             return f"a change to routing or management: {command}"
         port = _port(path)
-        if port is not None and (port.split(".")[0] in guarded_ports or port.startswith("MEth")):
+        if port is not None and (port.split(".")[0] in guarded_ports or naming.is_management(port.split(".")[0])):
             return f"a change on a fabric link, the peer-link or management: {command}"
         if shape(path) not in approved_shapes:
             return f"a change of a kind the approved patch does not have: {command}"

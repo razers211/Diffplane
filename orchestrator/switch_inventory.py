@@ -28,6 +28,7 @@ from orchestrator import faceplate as fp
 from orchestrator.segments import SegmentError
 from seed import ports
 from seed.loader import MANUFACTURER
+from generators import naming
 
 SYSTEM_NS = "urn:huawei:yang:huawei-system"
 DEVM_NS = "urn:huawei:yang:huawei-devm"
@@ -80,7 +81,7 @@ def parse(system_xml: str, ports_xml: str) -> Found:
     named = {}
     for port in ET.fromstring(ports_xml).iter(f"{{{DEVM_NS}}}port"):
         name = _text(port, DEVM_NS, "position")
-        if fp.FRONT_PANEL.fullmatch(name):
+        if naming.is_front_panel(name):
             named[name] = netbox_type(_text(port, DEVM_NS, "hard-type"))
         elif ":" in name:
             found.skipped.append(name)
@@ -137,7 +138,7 @@ async def templates(nb, device_type: dict, layout: dict[str, str]) -> None:
         elif (existing[name].get("type") or {}).get("value") != kind:
             await nb.update("dcim/interface-templates", existing[name]["id"], {"type": kind})
     for name, t in existing.items():
-        if name not in layout and fp.FRONT_PANEL.fullmatch(name):
+        if name not in layout and naming.is_front_panel(name):
             await nb.delete("dcim/interface-templates", t["id"])
 
 
@@ -151,7 +152,7 @@ async def plan(nb, name: str, found: Found) -> dict:
     if device is None:
         raise SegmentError(f"no device {name!r}")
     interfaces = {i["name"]: i for i in await nb.find("dcim/interfaces", device_id=device["id"])
-                  if fp.FRONT_PANEL.fullmatch(i["name"]) and (i.get("type") or {}).get("value") not in ("lag", "virtual")}
+                  if naming.is_front_panel(i["name"]) and (i.get("type") or {}).get("value") not in ("lag", "virtual")}
     face = {p["name"]: p for p in (await fp.faceplate(nb, name))["ports"]}
     gone = [p for p in interfaces if p not in found.ports]
     return {

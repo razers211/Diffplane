@@ -31,11 +31,11 @@ Microsegmentation, while the fabric's mode is Learn or Enforce:
 
 import asyncio
 import ipaddress
-import re
 from dataclasses import dataclass, field
 
 from generators.fabric import segment_vpn
 from seed import ports
+from generators import naming
 
 ERROR, WARNING = "error", "warning"
 GLOBAL = "_public_"
@@ -344,9 +344,6 @@ def _port_order(name: str) -> tuple:
     return (head, *(int(n) for n in rest.split("/") if n.isdigit()))
 
 
-FRONT_PANEL = re.compile(r"[A-Za-z0-9]*GE\d+/\d+/\d+")
-
-
 CHECKS = (route_cycles, duplicate_addresses, pool_overlaps, unattached_segments, service_ports,
           isp_peers_without_export, one_sided_mlag, microseg_checks, port_layouts, ports_off_in_use)
 
@@ -399,12 +396,12 @@ async def check_fabric(nb, prometheus, fabric: str) -> dict:
         name = (d.get("device_type") or {}).get("model")
         if status_of(d) != "active":
             continue
-        ours = {i["name"] for i in interfaces if i["device"]["name"] == d["name"] and FRONT_PANEL.fullmatch(i["name"])}
+        ours = {i["name"] for i in interfaces if i["device"]["name"] == d["name"] and naming.is_front_panel(i["name"])}
         seen = None
         if prometheus is not None:
             try:
                 _, _, oper = await prometheus.device_state(d["name"])
-                seen = {n for n in oper if FRONT_PANEL.fullmatch(n)} or None
+                seen = {n for n in oper if naming.is_front_panel(n)} or None
             except Exception:   # not read: the check says so and blocks
                 seen = None
         layouts[d["name"]] = (name, ours, seen, reported.get(d["name"]))

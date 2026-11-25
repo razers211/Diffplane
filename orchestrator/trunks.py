@@ -15,9 +15,8 @@ import re
 
 from orchestrator.netbox import NetBoxClient
 from orchestrator.segments import MLAG_TAG, PEER_LINK_TAG, UNNUMBERED_TAG, SegmentError, Segments, _cf, _ref_id
+from generators import naming
 
-TRUNK = re.compile(r"Eth-Trunk(\d+)$")
-MEMBER = re.compile(r"\d*GE\d+/\d+/\d+$")   # front-panel ports: 10GE1/0/4, 100GE1/0/1; never MEth
 # Eth-Trunk numbers offered here. The CE6881H's own range is unverified; this stays inside it
 # (the lab test covers what is used).
 MAX_NUMBER = 1023
@@ -32,7 +31,7 @@ def _kind(iface: dict) -> str | None:
 
 
 def _number(name: str) -> int:
-    return int(TRUNK.match(name).group(1))
+    return naming.trunk_number(name)
 
 
 class Trunks:
@@ -68,7 +67,7 @@ class Trunks:
     def _free(iface: dict, routed: set[int], services: set[str]) -> bool:
         """A port that may join a new trunk: a front-panel port, in no trunk, with no address
         (not a fabric link), no segments and no service."""
-        return (MEMBER.match(iface["name"]) is not None and _kind(iface) not in ("lag", "virtual")
+        return (naming.is_front_panel(iface["name"]) and _kind(iface) not in ("lag", "virtual")
                 and not iface.get("lag") and iface["id"] not in routed and UNNUMBERED_TAG not in _tags(iface)
                 and not _cf(iface, "segments")
                 and iface["name"] not in services)
@@ -87,7 +86,7 @@ class Trunks:
                 members.setdefault(lag_name, []).append(iface["name"])
         trunks = []
         for iface in interfaces:
-            if _kind(iface) != "lag" or not TRUNK.match(iface["name"]):
+            if _kind(iface) != "lag" or not naming.is_trunk(iface["name"]):
                 continue
             tags = _tags(iface)
             trunks.append({
@@ -103,18 +102,18 @@ class Trunks:
         if peer is not None:
             p_interfaces, p_routed, p_services = states[1]
             p_free = {i["name"] for i in p_interfaces if self._free(i, p_routed, p_services)}
-            p_used = {i["name"] for i in p_interfaces if TRUNK.match(i["name"])}
+            p_used = {naming.trunk_number(i["name"]) for i in p_interfaces if naming.is_trunk(i["name"])}
             pair_free = sorted((n for n in free if n in p_free), key=_port_key)
         else:
             p_used = set()
-        used = {i["name"] for i in interfaces if TRUNK.match(i["name"])} | p_used
+        used = {naming.trunk_number(i["name"]) for i in interfaces if naming.is_trunk(i["name"])} | p_used
         return {
             "device": name,
             "peer": peer["name"] if peer else None,
             "trunks": sorted(trunks, key=lambda t: t["number"]),
             "free_ports": sorted(free, key=_port_key),
             "pair_free_ports": pair_free,
-            "next_number": next(n for n in range(1, MAX_NUMBER + 2) if f"Eth-Trunk{n}" not in used),
+            "next_number": next(n for n in range(1, MAX_NUMBER + 2) if n not in used),
         }
 
     # -- writing ---------------------------------------------------------------------------
@@ -133,7 +132,7 @@ class Trunks:
         if len(set(members)) != len(members):
             raise SegmentError("a member port is listed twice")
         device = await self._device(name)
-        trunk = f"Eth-Trunk{number}"
+        trunk = naming.trunk(naming.HUAWEI, number)   # shortcut: Huawei only until a fabric names its vendor (ROADMAP, Arista step 2)
         devices = [device]
         if mlag:
             peer = await self._peer(device)

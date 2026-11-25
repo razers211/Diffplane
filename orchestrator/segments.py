@@ -16,6 +16,7 @@ from dataclasses import dataclass
 from generators.fabric import VPN_NAME_MAX, segment_vpn
 from orchestrator import documents
 from orchestrator.netbox import NetBoxClient
+from generators import naming
 
 MAX_ID = 16777215  # 24-bit VNI; also the bridge-domain ID range used here
 # derives the L3 VNI as L2 VNI + L3_VNI_OFFSET, which must still fit.
@@ -375,7 +376,7 @@ class Segments:
         """Why this port cannot carry segments, or None if it can."""
         interface = iface["name"]
         kind = (iface.get("type") or {}).get("value")
-        if kind == "virtual" or interface.startswith(("MEth", "LoopBack", "Vlanif", "Nve")) or "." in interface:
+        if kind == "virtual" or naming.is_management(interface) or naming.is_virtual(interface) or "." in interface:
             return f"{device_name} {interface}: only physical ports and server trunks carry segments"
         if iface.get("lag"):
             return f"{device_name} {interface} is a trunk member; attach to its trunk instead"

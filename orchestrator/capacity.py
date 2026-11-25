@@ -19,9 +19,9 @@ from datetime import date, datetime, timedelta, timezone
 from sqlalchemy import delete, func, select
 from sqlalchemy.dialects.postgresql import insert
 
-from orchestrator.faceplate import FRONT_PANEL
 from orchestrator.db import TrafficHour
 from orchestrator.routing_intent import status_of
+from generators import naming
 
 log = logging.getLogger("orchestrator.capacity")
 
@@ -47,7 +47,7 @@ def trunk_members(devices: list[dict], interfaces: list[dict]) -> dict[tuple[str
     for i in interfaces:
         device = active.get((i.get("device") or {}).get("id"))
         lag = i.get("lag")
-        if device and isinstance(lag, dict) and lag.get("name") and FRONT_PANEL.fullmatch(i["name"]):
+        if device and isinstance(lag, dict) and lag.get("name") and naming.is_front_panel(i["name"]):
             members[(device, lag["name"])].append(i["name"])
     return {key: sorted(ports) for key, ports in sorted(members.items())}
 

@@ -35,7 +35,8 @@ import time
 from pathlib import Path
 
 from orchestrator import hostkeys
-from orchestrator.lifecycle import MGMT, Lifecycle
+from orchestrator.lifecycle import Lifecycle
+from generators import naming
 from orchestrator.netbox import NetBoxClient
 from orchestrator.redact import redact
 from orchestrator.segments import SegmentError
@@ -185,8 +186,8 @@ class Ztp:
         status = device.get("status")
         if (status.get("value") if isinstance(status, dict) else status) != "planned":
             raise SegmentError(f"{name} is active: only a planned switch is provisioned")
-        if not MGMT.match(interface):
-            raise SegmentError(f"the management interface is a MEth port, not {interface!r}")
+        if not naming.is_management(interface):
+            raise SegmentError(f"{interface!r} is not a management port (MEth0/0/0, Management1)")
         mac = normalize_mac(mac)
         try:
             addr = ipaddress.IPv4Interface(address)

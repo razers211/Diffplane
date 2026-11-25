@@ -10,8 +10,9 @@ from dataclasses import dataclass, field
 
 from orchestrator import documents
 from orchestrator.netbox import NetBoxClient
-from seed.model import Fabric, LeafPair, Link, interface_type
+from seed.model import VENDOR, Fabric, LeafPair, Link, interface_type
 from seed import ports
+from generators import naming
 
 ROLES = {"spine": "2196f3", "leaf": "4caf50", "border-leaf": "ff9800"}
 PEER_LINK_TAG = "peer-link"
@@ -424,7 +425,7 @@ class Seeder:
                                              {"tags": [*(t["id"] for t in lag.get("tags") or []), self._ids["tag:m-lag"]]})
                         self.report.add(f"update dcim/interfaces {leaf} {trunk.name}: tags")
         # VXLAN bypass between the peers: a Vlanif over the peer-link, one /30 per pair.
-        vlanif = f"Vlanif{self.fabric.services.mlag_bypass_vlan}"
+        vlanif = naming.svi(VENDOR, self.fabric.services.mlag_bypass_vlan)
         for leaf in pair.leaves:
             await self._rename_old_bypass(leaf, vlanif)
         ifaces = [await self._interface(leaf, vlanif) for leaf in pair.leaves]
@@ -437,7 +438,7 @@ class Seeder:
         pool = self.fabric.mlag_bypass_prefix
         for iface in await self.nb.find("dcim/interfaces", device_id=self._ids[leaf]):
             name = iface["name"]
-            if name == vlanif or not name.startswith("Vlanif"):
+            if name == vlanif or naming.svi_vlan(name) is None:
                 continue
             ips = await self.nb.find("ipam/ip-addresses", interface_id=iface["id"])
             if any(ipaddress.ip_interface(ip["address"]).ip in pool for ip in ips):
@@ -523,8 +524,9 @@ class Seeder:
                 await self._loopback0(leaf)
             await self._vtep(pair)
 
-    async def _loopback0(self, device: str, name: str = "LoopBack0", pool: str = "loopback") -> None:
+    async def _loopback0(self, device: str, name: str | None = None, pool: str = "loopback") -> None:
         """The device's own address on a loopback: LoopBack0, or a PIP's LoopBack1."""
+        name = name or naming.loopback(VENDOR, 0)
         iface = await self._interface(device, name)
         found = await self.nb.find("ipam/ip-addresses", interface_id=iface["id"], role="loopback")
         if found:
@@ -536,10 +538,10 @@ class Seeder:
 
     async def _vtep(self, pair: LeafPair) -> None:
         pip = "prefix:pip" in self._ids   # the PIP layout: own PIP on LoopBack1, the VTEP on LoopBack2
-        name = "LoopBack2" if pip else "LoopBack1"
+        name = naming.loopback(VENDOR, 2 if pip else 1)
         if pip:
             for leaf in pair.leaves:
-                await self._loopback0(leaf, "LoopBack1", "pip")
+                await self._loopback0(leaf, naming.loopback(VENDOR, 1), "pip")
         ifaces = {leaf: await self._interface(leaf, name) for leaf in pair.leaves}
         found = {
             leaf: await self.nb.find("ipam/ip-addresses", interface_id=iface["id"], role="anycast")

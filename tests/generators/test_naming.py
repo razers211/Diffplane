@@ -30,3 +30,11 @@ def test_the_vendor_comes_from_annets_hardware_view():
     assert naming.vendor_of(SimpleNamespace(hw=SimpleNamespace(vendor="arista"))) == "arista"
     assert naming.vendor_of(SimpleNamespace(hw=SimpleNamespace(vendor="huawei"))) == "huawei"
     assert naming.vendor_of(SimpleNamespace()) == "huawei"
+
+
+def test_routed_vlan_and_virtual_interfaces():
+    assert naming.svi("huawei", 4093) == "Vlanif4093" and naming.svi("arista", 4093) == "Vlan4093"
+    assert naming.svi_vlan("Vlanif4093") == 4093 and naming.svi_vlan("Vlan4093") == 4093
+    assert naming.svi_vlan("Vbdif500") is None and naming.svi_vlan("Vlanif4093.1") is None
+    assert all(map(naming.is_virtual, ["LoopBack0", "Loopback1", "Vlanif4093", "Vlan10", "Vbdif500", "Nve1", "Vxlan1"]))
+    assert not any(map(naming.is_virtual, ["Ethernet1", "10GE1/0/1", "Eth-Trunk1", "Management1"]))

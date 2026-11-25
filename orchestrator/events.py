@@ -25,10 +25,10 @@ from sqlalchemy import delete, select
 from orchestrator import health
 from orchestrator.db import AuditEvent, Event, Job
 from orchestrator.routing_intent import status_of
+from generators import naming
 
 log = logging.getLogger("orchestrator.events")
 
-MGMT = "MEth0/0/0"
 # Audit actions that are not changes to a fabric (sign-ins, accounts, settings): never on the timeline.
 NOT_CHANGES = re.compile(r"^(login|user\.|settings\.|directory\.)")
 
@@ -62,7 +62,7 @@ def states(fabric: str, f: health.Facts, view: dict) -> dict[tuple, State]:
             put(name, "drift", "intent", f.drift[name], f.drift[name] in ("out_of_sync", "error"))
         if not polled:
             continue    # its other series are gone; nothing recorded for what disappears
-        for port in sorted(f.in_use.get(name, set()) | {MGMT}):
+        for port in sorted(f.in_use.get(name, set()) | {p for (n, p) in f.oper if n == name and naming.is_management(p)}):
             if (up := f.oper.get((name, port))) is not None:
                 put(name, "link", port, "up" if up else "down", not up and (name, port) not in f.expected_down)
         plane = f.control.get(name) or {}

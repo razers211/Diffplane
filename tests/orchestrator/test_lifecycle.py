@@ -60,7 +60,7 @@ def test_activation_refusals(nb):
         (("leaf2", "172.24.0.105"), "with its mask"),
         (("leaf2", "172.24.0.0/24"), "with its mask"),
         (("leaf2", "nonsense/24"), "invalid address"),
-        (("leaf2", "172.24.0.105/24", "10GE1/0/1"), "MEth port"),
+        (("leaf2", "172.24.0.105/24", "10GE1/0/1"), "not a management port"),
         (("nope", "172.24.0.105/24"), "no device"),
     ]:
         with pytest.raises(SegmentError, match=message):

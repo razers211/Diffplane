@@ -18,6 +18,7 @@ from sqlalchemy import delete, select
 
 from orchestrator import documents
 from orchestrator.db import IntentSnapshot, now
+from generators import naming
 
 KEEP_DAYS = 90
 KEEP_LAST = 20
@@ -69,12 +70,12 @@ async def _dci_links(nb, fabric: str) -> list[dict]:
 
 def _ports(interfaces: list[dict]) -> dict[str, dict[str, dict]]:
     """Port settings that differ from a port's defaults, per device: name, off, frame size, speed."""
-    from orchestrator.port_settings import DEFAULT, PHYSICAL, settings_of
+    from orchestrator.port_settings import DEFAULT, settings_of
 
     found: dict[str, dict[str, dict]] = {}
     for iface in interfaces:
         values = settings_of(iface)
-        if (PHYSICAL.fullmatch(iface["name"]) or iface["name"].startswith("Eth-Trunk")) \
+        if (naming.is_front_panel(iface["name"]) or naming.is_trunk(iface["name"])) \
                 and values != DEFAULT:
             found.setdefault(iface["device"]["name"], {})[iface["name"]] = values
     return {device: dict(sorted(ports.items())) for device, ports in sorted(found.items())}
@@ -82,7 +83,7 @@ def _ports(interfaces: list[dict]) -> dict[str, dict[str, dict]]:
 
 def _trunks(interfaces: list[dict]) -> dict[str, list[dict]]:
     """Server Eth-Trunks per device (peer-links are structural: the fabric YAML's)."""
-    from orchestrator.trunks import MLAG_TAG, PEER_LINK_TAG, TRUNK, _kind, _number, _port_key, _tags
+    from orchestrator.trunks import MLAG_TAG, PEER_LINK_TAG, _kind, _number, _port_key, _tags
 
     members: dict[int, list[str]] = {}
     for iface in interfaces:
@@ -90,7 +91,7 @@ def _trunks(interfaces: list[dict]) -> dict[str, list[dict]]:
             members.setdefault(iface["lag"]["id"], []).append(iface["name"])
     found: dict[str, list[dict]] = {}
     for iface in interfaces:
-        if _kind(iface) != "lag" or not TRUNK.match(iface["name"]) or PEER_LINK_TAG in _tags(iface):
+        if _kind(iface) != "lag" or not naming.is_trunk(iface["name"]) or PEER_LINK_TAG in _tags(iface):
             continue
         found.setdefault(iface["device"]["name"], []).append({
             "number": _number(iface["name"]),

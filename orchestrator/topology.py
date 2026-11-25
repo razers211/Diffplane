@@ -14,6 +14,7 @@ an interface without a NetBox cable become "unexpected" links.
 
 import re
 from dataclasses import dataclass, field
+from generators import naming
 
 Port = tuple[str, str]  # (device, interface)
 
@@ -101,7 +102,7 @@ def build(devices: list[Device], cables: list[tuple[Port, Port]], telemetry: Tel
             # only the fabric's switches are drawn: no servers or outside switches,
             # and not the management network (MEth to an access switch)
             if (key in seen_unexpected or neighbour[0] not in nodes
-                    or port[1].startswith("MEth") or neighbour[1].startswith("MEth")):
+                    or naming.is_management(port[1]) or naming.is_management(neighbour[1])):
                 continue
             seen_unexpected.add(key)
             links.append(

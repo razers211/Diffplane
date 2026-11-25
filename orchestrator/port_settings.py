@@ -25,9 +25,10 @@ from orchestrator import documents
 from orchestrator.fabric_ntp import _context, _update_fabric
 from seed.ports import is_copper
 from orchestrator.segments import MLAG_TAG, PEER_LINK_TAG, UNNUMBERED_TAG, SegmentError, Segments, _cf, _ref_id
+from generators import naming
+
 
 KEY = "port_profiles"
-PHYSICAL = re.compile(r"\d*GE\d+/\d+/\d+")
 FRAME = (1518, 15360)   # `jumboframe enable` range; the default 9216
 DESCRIPTION_MAX = 242
 SPEEDS = (10, 100, 1000, 10000)   # Mbit/s (the switch's help)
@@ -72,9 +73,9 @@ async def _excluded(nb, fabric: str) -> dict[str, dict[str, str]]:
 def refusal(device: str, iface: dict, routed: bool, excluded: dict[str, str]) -> str | None:
     """Why this interface takes no port settings, or None (a server port or server trunk)."""
     name, kind = iface["name"], _kind(iface)
-    if kind == "lag" and name.startswith("Eth-Trunk"):
+    if kind == "lag" and naming.is_trunk(name):
         pass
-    elif kind == "virtual" or not PHYSICAL.fullmatch(name):
+    elif kind == "virtual" or not naming.is_front_panel(name):
         return f"{device} {name}: only front-panel ports and server Eth-Trunks have port settings"
     elif iface.get("lag"):
         return f"{device} {name} is a trunk member: set it on its trunk"

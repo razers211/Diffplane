@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import yaml
+from generators import naming
 
 # Huawei port name prefix -> NetBox interface type.
 _PORT_TYPES = {
@@ -23,17 +24,20 @@ LEAF_ROLES = ("leaf", "border-leaf")
 # gateway pair (M-LAG) holding every gateway while the other leaves stay layer 2.
 ARCHITECTURES = ("symmetric", "centralized")
 
+# shortcut: every fabric is Huawei until a fabric names its vendor (ROADMAP, Arista step 2).
+VENDOR = naming.HUAWEI
+
 
 class FabricError(ValueError):
     pass
 
 
 def interface_type(name: str) -> str:
-    if re.fullmatch(r"MEth\d+/\d+/\d+", name):
+    if naming.is_management(name):
         return "1000base-t"
-    if re.fullmatch(r"Eth-Trunk\d+", name):
+    if naming.is_trunk(name):
         return "lag"
-    if re.fullmatch(r"(LoopBack|Vlanif)\d+", name):
+    if naming.is_virtual(name):
         return "virtual"
     match = _PORT_RE.fullmatch(name)
     if match and match.group(1) in _PORT_TYPES:
@@ -57,7 +61,7 @@ class MlagTrunk:
 
     @property
     def name(self) -> str:
-        return f"Eth-Trunk{self.trunk}"
+        return naming.trunk(VENDOR, self.trunk)
 
 
 @dataclass(frozen=True)
@@ -74,7 +78,7 @@ class LeafPair:
 
     @property
     def peer_link_name(self) -> str:
-        return f"Eth-Trunk{self.peer_link_trunk}"
+        return naming.trunk(VENDOR, self.peer_link_trunk)
 
 
 @dataclass(frozen=True)

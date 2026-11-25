@@ -22,9 +22,10 @@ from orchestrator import documents, hostkeys, switch_inventory
 from orchestrator.netbox import NetBoxClient
 from orchestrator.segments import SegmentError
 from seed.loader import POOLS, SeedError, Seeder
-from seed.model import Fabric, FabricError, LeafPair, Link, MlagTrunk, interface_type
+from seed.model import VENDOR, Fabric, FabricError, LeafPair, Link, MlagTrunk, interface_type
 from seed import ports as seed_ports
 from seed.ports import ports_of
+from generators import naming
 
 NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,62}\Z")
 LEAF_ROLES = ("leaf", "border-leaf")
@@ -127,7 +128,7 @@ class FabricBuilder(Seeder):
         iface = await self.nb.find_one("dcim/interfaces", device_id=self.devices[device]["id"], name=port)
         if iface is None:
             raise SegmentError(f"{device} has no port {port!r}")
-        if (iface.get("type") or {}).get("value") in ("lag", "virtual") or port.startswith("MEth"):
+        if (iface.get("type") or {}).get("value") in ("lag", "virtual") or naming.is_management(port):
             raise SegmentError(f"{device} {port} is not a front-panel port")
         if iface.get("cable") or iface.get("lag") or (iface.get("custom_fields") or {}).get("segments") \
                 or await self.nb.find("ipam/ip-addresses", interface_id=iface["id"]):
@@ -146,7 +147,7 @@ class FabricBuilder(Seeder):
             kind = interface_type(port)
         except FabricError as exc:
             raise SegmentError(str(exc)) from exc
-        if kind in ("lag", "virtual") or port.startswith("MEth"):
+        if kind in ("lag", "virtual") or naming.is_management(port):
             raise SegmentError(f"{device} {port} is not a front-panel port")
         if (device, port) in used:
             raise SegmentError(f"{device} {port} is used twice")
@@ -165,7 +166,7 @@ class FabricBuilder(Seeder):
             role = _role(device)
             routed = {ip.get("assigned_object_id") for ip in addresses}
             free = [i["name"] for i in interfaces
-                    if (i.get("type") or {}).get("value") not in ("lag", "virtual") and not i["name"].startswith("MEth")
+                    if (i.get("type") or {}).get("value") not in ("lag", "virtual") and not naming.is_management(i["name"])
                     and not i.get("cable") and not i.get("lag") and i["id"] not in routed
                     and not (i.get("custom_fields") or {}).get("segments")]
             devices.append({"name": name, "role": role, "free_ports": sorted(free, key=_port_key),
@@ -291,8 +292,8 @@ class FabricBuilder(Seeder):
                     self._existing(n, ("spine",), "spine")
                     if (self.devices[n].get("custom_fields") or {}).get("mlag_peer"):
                         raise SegmentError(f"{n} is already in an M-LAG pair")
-                    if await self.nb.find("dcim/interfaces", device_id=self.devices[n]["id"], name=f"Eth-Trunk{trunk}"):
-                        raise SegmentError(f"{n} already has Eth-Trunk{trunk}: pick another peer-link trunk number")
+                    if await self.nb.find("dcim/interfaces", device_id=self.devices[n]["id"], name=naming.trunk(VENDOR, trunk)):
+                        raise SegmentError(f"{n} already has {naming.trunk(VENDOR, trunk)}: pick another peer-link trunk number")
                     for member in members:
                         self._claim(used, n, member)
                         await self._free_port(n, member)
@@ -471,9 +472,9 @@ class FabricBuilder(Seeder):
             if not isinstance(number, int) or not 1 <= number <= MAX_TRUNK or number == peer_link:
                 raise SegmentError(f"M-LAG trunk number {number!r}: 1-{MAX_TRUNK}, not the peer-link's")
             if not members:
-                raise SegmentError(f"Eth-Trunk{number} needs at least one member")
+                raise SegmentError(f"{naming.trunk(VENDOR, number)} needs at least one member")
             if number in (x.trunk for x in trunks):
-                raise SegmentError(f"Eth-Trunk{number} is given twice")
+                raise SegmentError(f"{naming.trunk(VENDOR, number)} is given twice")
             trunks.append(MlagTrunk(trunk=number, members=members))
         return tuple(trunks)
 
@@ -512,14 +513,14 @@ class FabricBuilder(Seeder):
 
     async def _own_vtep(self, leaf: str) -> None:
         """A lone leaf's own VTEP address on LoopBack1, from the VTEP pool."""
-        iface = await self._interface(leaf, "LoopBack1")
+        iface = await self._interface(leaf, naming.loopback(VENDOR, 1))
         if await self.nb.find("ipam/ip-addresses", interface_id=iface["id"], role="anycast"):
             return
         ip = await self.nb.allocate_ip(self._ids["prefix:vtep"],
                                        {"assigned_object_type": "dcim.interface", "assigned_object_id": iface["id"],
                                         "status": "active", "role": "anycast"})
         await self._host_mask(ip, None)
-        self.report.add(f"allocate ipam/ip-addresses {ip['address']} for {leaf} LoopBack1 (VTEP)")
+        self.report.add(f"allocate ipam/ip-addresses {ip['address']} for {leaf} {naming.loopback(VENDOR, 1)} (VTEP)")
 
     # -- removal ---------------------------------------------------------------------------
 
@@ -612,7 +613,7 @@ class FabricBuilder(Seeder):
         Its cables and the bypass /30 went with the removed spine."""
         device = await self.nb.find_one("dcim/devices", name=name)
         interfaces = await self.nb.find("dcim/interfaces", device_id=device["id"])
-        bypass = f"Vlanif{self.fabric.services.mlag_bypass_vlan}"
+        bypass = naming.svi(VENDOR, self.fabric.services.mlag_bypass_vlan)
         for iface in interfaces:
             tags = {t.get("slug") for t in iface.get("tags") or [] if isinstance(t, dict)}
             if "peer-link" in tags:
@@ -621,7 +622,7 @@ class FabricBuilder(Seeder):
                     if (lag.get("id") if isinstance(lag, dict) else lag) == iface["id"]:
                         await self.nb.update("dcim/interfaces", member["id"], {"lag": None})
                 await self.nb.delete("dcim/interfaces", iface["id"])
-            elif iface["name"] in ("LoopBack1", "LoopBack2", bypass):
+            elif iface["name"] in (naming.loopback(VENDOR, 1), naming.loopback(VENDOR, 2), bypass):
                 for ip in await self.nb.find("ipam/ip-addresses", interface_id=iface["id"]):
                     await self.nb.delete("ipam/ip-addresses", ip["id"])
                 await self.nb.delete("dcim/interfaces", iface["id"])

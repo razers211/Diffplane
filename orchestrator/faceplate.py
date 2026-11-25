@@ -15,12 +15,10 @@ free or has a cable in NetBox.
 """
 
 import asyncio
-import re
 import time
 
 from orchestrator.segments import MLAG_TAG, PEER_LINK_TAG, UNNUMBERED_TAG, SegmentError, _cf, _ref_id
-
-FRONT_PANEL = re.compile(r"\d*GE\d+/\d+/\d+$")   # 10GE1/0/4, 100GE1/0/1; never MEth, never .N
+from generators import naming
 
 
 def _tags(obj: dict) -> set[str]:
@@ -50,7 +48,7 @@ async def faceplate(nb, name: str) -> dict:
 
     ports = []
     for iface in interfaces:
-        if not FRONT_PANEL.fullmatch(iface["name"]) or (iface.get("type") or {}).get("value") in ("lag", "virtual"):
+        if not naming.is_front_panel(iface["name"]) or (iface.get("type") or {}).get("value") in ("lag", "virtual"):
             continue
         lag = by_id.get(_ref_id(iface.get("lag"))) if iface.get("lag") else None
         far = next(iter(iface.get("link_peers") or []), None)

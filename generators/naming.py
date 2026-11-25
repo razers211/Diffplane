@@ -14,11 +14,14 @@ HUAWEI, ARISTA = "huawei", "arista"
 VENDORS = (HUAWEI, ARISTA)
 
 _LOOPBACK = {HUAWEI: "LoopBack", ARISTA: "Loopback"}
+_SVI = {HUAWEI: "Vlanif", ARISTA: "Vlan"}   # a routed VLAN interface (the M-LAG bypass, services)
 _TRUNK = {HUAWEI: "Eth-Trunk", ARISTA: "Port-Channel"}
 _TRUNK_RE = re.compile(r"(?:Eth-Trunk|Port-Channel)(\d+)")
 _MANAGEMENT_RE = re.compile(r"MEth\d+/\d+/\d+|Management\d+(?:/\d+)?")
 # VRP 10GE1/0/4, 100GE1/0/1; EOS Ethernet1, Ethernet49/1. Never a sub-interface (.N).
 _FRONT_PANEL_RE = re.compile(r"\d{0,3}GE\d+/\d+/\d+|Ethernet\d+(?:/\d+){0,2}")
+# Interfaces that exist only in software: loopbacks, routed VLANs, VTEPs (VRP Nve, VBDIF; EOS Vxlan).
+_VIRTUAL_RE = re.compile(r"(?:LoopBack|Loopback|Vlanif|Vlan|Vbdif|Nve|Vxlan)\d+")
 
 
 def vendor_of(device) -> str:
@@ -42,6 +45,16 @@ def trunk(vendor: str, number: int) -> str:
     return f"{_TRUNK[_check(vendor)]}{number}"
 
 
+def svi(vendor: str, vlan: int) -> str:
+    return f"{_SVI[_check(vendor)]}{vlan}"
+
+
+def svi_vlan(name: str) -> int | None:
+    """Vlanif4093 / Vlan4093 -> 4093; anything else None."""
+    match = re.fullmatch(r"(?:Vlanif|Vlan)(\d+)", name)
+    return int(match.group(1)) if match else None
+
+
 def trunk_number(name: str) -> int | None:
     """Eth-Trunk7 / Port-Channel7 -> 7; anything else None."""
     match = _TRUNK_RE.fullmatch(name)
@@ -58,3 +71,7 @@ def is_management(name: str) -> bool:
 
 def is_front_panel(name: str) -> bool:
     return _FRONT_PANEL_RE.fullmatch(name) is not None
+
+
+def is_virtual(name: str) -> bool:
+    return _VIRTUAL_RE.fullmatch(name) is not None
