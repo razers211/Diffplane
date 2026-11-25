@@ -223,11 +223,10 @@ def _bridge(fabric: Fabric, segment: dict, a: str | None, b: str | None) -> list
 
 
 def _statics(fabric: Fabric, switch: str | None) -> list[dict]:
+    # The pair's routing and the switch's own.
     targets = (fabric.model.routing or {}).get("devices") or {}
-    for target, routing in sorted(targets.items()):
-        if switch and switch in target.split("+"):
-            return (routing or {}).get("static_routes") or []
-    return []
+    return [route for target, routing in sorted(targets.items()) if switch and switch in target.split("+")
+            for route in (routing or {}).get("static_routes") or []]
 
 
 def trace(fabric: Fabric, tables: Tables, source: str, destination: str) -> dict:

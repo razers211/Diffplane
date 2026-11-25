@@ -62,7 +62,9 @@ A **service** connects routed segments to something outside the fabric:
 
 BGP peers, route-policies, prefix lists, AS-path and community filters, aggregates, static
 routes and OSPF processes are kept as one validated JSON document per fabric. On an M-LAG pair,
-intent is defined once and generated identically on both switches.
+intent is defined once and generated identically on both switches; each switch of the pair may
+also have routing of its own, on it alone (for example each ISP link's BGP session on its own
+border switch). An object in both must be identical.
 
 Ownership differs from the rest of the configuration: Diffplane owns only the routing objects in
 intent (and the ones deleted from intent until a verified deploy removed them). Routing objects

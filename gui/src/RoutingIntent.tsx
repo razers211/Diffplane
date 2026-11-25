@@ -112,6 +112,7 @@ export function RoutingTargets({ site }: { site: string }) {
                   <td>
                     <a className="mono" href={href(t.target)}>{targetLabel(t.target)}</a>{" "}
                     {t.target.includes("+") && <span className="chip accent">pair</span>}
+                    {t.pair && <span className="chip" title={`On this switch alone, besides ${targetLabel(t.pair)}'s routing`}>this switch only</span>}
                     <div className="small">
                       {t.devices.map((d) => (
                         <span key={d.name} className={`pill status-${d.status}`}>{d.status}</span>
@@ -255,6 +256,7 @@ export function RoutingTargetPage({ site, target }: { site: string; target: stri
   const retired = doc.data?.retired?.[target];
   const info = targets.data?.find((t) => t.target === target);
   const vpns = info?.vpns ?? [];
+  const pairOf = target.includes("+") ? target : info?.pair ?? null;
 
   const save: Save = async (next, what) => {
     setError(null);
@@ -286,10 +288,21 @@ export function RoutingTargetPage({ site, target }: { site: string; target: stri
         </span>
       </div>
       {targets.data && !info && <p className="error">{target} is not a device or M-LAG pair of {site}.</p>}
+      {pairOf && (
+        <span className="toggle" role="group" aria-label="Where this routing goes" style={{ marginLeft: 0 }}>
+          {[pairOf, ...pairOf.split("+")].map((t) => (
+            <button key={t} aria-pressed={target === t} onClick={() => (window.location.hash = href(t))}>
+              {t === pairOf ? "Both switches" : `${t} only`}
+            </button>
+          ))}
+        </span>
+      )}
       <p className="muted">
         {target.includes("+")
-          ? "An M-LAG pair: everything here is generated identically on both leaves. "
-          : ""}
+          ? "An M-LAG pair: everything here is generated identically on both switches. For a session or route on one switch only (e.g. each ISP link on its own border switch), pick that switch above. "
+          : info?.pair
+            ? `On ${target} alone, besides the pair's routing (Both switches). The same list or policy may be in both only if identical. `
+            : ""}
         VPN instances available here: {vpns.length ? vpns.join(", ") : "none"} (and the global table).
       </p>
       {doc.error && <p className="error">Could not load routing intent: {doc.error}</p>}

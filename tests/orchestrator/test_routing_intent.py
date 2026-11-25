@@ -146,16 +146,44 @@ def test_api_sets_and_reads_device_routing(monkeypatch):
 
 # -- M-LAG pairs (a pair's routing is identical on both leaves) ----------
 
-def test_a_paired_leaf_has_no_intent_of_its_own():
+def test_a_paired_switch_has_its_own_routing_next_to_the_pairs():
     from orchestrator.segments import SegmentError
 
     store = RoutingStore(example_netbox())
-    with pytest.raises(SegmentError, match="is in M-LAG pair leaf1\\+leaf2"):
-        asyncio.run(store.set_device("example", "leaf1", DeviceRouting()))
     for bad in ("leaf2+leaf1", "leaf1+spine1", "spine1+leaf1+leaf2"):
         with pytest.raises(SegmentError):
             asyncio.run(store.set_device("example", bad, DeviceRouting()))
     asyncio.run(store.set_device("example", "spine1", DeviceRouting()))   # an unpaired device: its own
+
+    pfx = {"OWN": [{"index": 10, "action": "permit", "prefix": "198.51.100.0/24"}]}
+    pair = {"prefix_lists": pfx, "bgp_peers": [{"address": "192.0.2.1", "asn": 65100}]}
+    asyncio.run(store.set_device("example", "leaf1+leaf2", DeviceRouting.model_validate(pair)))
+    # the same list, identical, may sit in both; a peer of its own on leaf2
+    own = {"prefix_lists": pfx, "bgp_peers": [{"address": "192.0.2.9", "asn": 65109, "export_prefix_list": "OWN"}]}
+    asyncio.run(store.set_device("example", "leaf2", DeviceRouting.model_validate(own)))
+    with pytest.raises(SegmentError, match="prefix lists OWN also in the routing of leaf1\\+leaf2"):
+        asyncio.run(store.set_device("example", "leaf2", DeviceRouting.model_validate(
+            {"prefix_lists": {"OWN": [{"index": 10, "action": "permit", "prefix": "203.0.113.0/24"}]}})))
+    with pytest.raises(SegmentError, match="peer 192.0.2.9 also in the routing of leaf2"):
+        asyncio.run(store.set_device("example", "leaf1+leaf2", DeviceRouting.model_validate(
+            {**pair, "bgp_peers": [*pair["bgp_peers"], {"address": "192.0.2.9", "asn": 65999}]})))
+    document = asyncio.run(store.load("example"))
+    assert [str(p.address) for p in document.device("leaf2").bgp_peers] == ["192.0.2.9"]
+    assert [str(p.address) for p in document.device("leaf1+leaf2").bgp_peers] == ["192.0.2.1"]
+
+
+def test_a_switchs_own_retired_objects_go_with_its_own_verified_deploy():
+    nb = example_netbox()
+    leaf2 = asyncio.run(nb.find_one("dcim/devices", name="leaf2"))
+    asyncio.run(nb.update("dcim/devices", leaf2["id"], {"status": "active"}))
+    store = RoutingStore(nb)
+    asyncio.run(store.set_device("example", "leaf2", DeviceRouting.model_validate(
+        {"bgp_peers": [{"address": "192.0.2.9", "asn": 65109}]})))
+    asyncio.run(store.set_device("example", "leaf2", DeviceRouting()))
+    asyncio.run(store.clear_retired("leaf1"))
+    assert "leaf2" in asyncio.run(store.load("example")).retired   # not the switch it is on
+    asyncio.run(store.clear_retired("leaf2"))
+    assert asyncio.run(store.load("example")).retired == {}
 
 
 def test_a_pairs_retired_objects_go_once_both_active_leaves_are_verified():
@@ -290,7 +318,8 @@ def test_api_lists_targets_with_their_vpn_instances(monkeypatch):
     app.dependency_overrides[get_netbox] = lambda: nb
     try:
         targets = {t["target"]: t for t in TestClient(app).get("/routing/example/targets").json()}
-        assert set(targets) == {"leaf1+leaf2", "spine1"}
+        assert set(targets) == {"leaf1+leaf2", "leaf1", "leaf2", "spine1"}
+        assert targets["leaf2"]["pair"] == "leaf1+leaf2" and targets["spine1"]["pair"] is None
         pair = targets["leaf1+leaf2"]
         assert [d["name"] for d in pair["devices"]] == ["leaf1", "leaf2"]
         assert [d["status"] for d in pair["devices"]] == ["active", "planned"]

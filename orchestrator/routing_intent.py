@@ -358,6 +358,38 @@ class DeviceRouting(Strict):
         return uses
 
 
+def _objects(routing: DeviceRouting) -> dict:
+    """Every object of a target's routing by identity: (kind, name) or its key."""
+    found = {}
+    for kind in ("prefix_lists", "as_path_filters", "community_filters", "route_policies"):
+        for name, value in getattr(routing, kind).items():
+            found[(kind, name)] = [v.model_dump(mode="json") for v in value]
+    for kind in ("static_routes", "bgp_peers", "aggregates", "ospf"):
+        for item in getattr(routing, kind):
+            found[item.key] = item.model_dump(mode="json")
+    return found
+
+
+def clashes(a: DeviceRouting, b: DeviceRouting) -> list[str]:
+    """Objects two targets that meet on one switch (a pair and one of its switches) both have,
+    differently."""
+    mine, theirs = _objects(a), _objects(b)
+    return [" ".join(str(k) for k in key if k).replace("_", " ") for key in sorted(mine.keys() & theirs.keys(), key=str)
+            if mine[key] != theirs[key]]
+
+
+def combined(*routings: DeviceRouting) -> DeviceRouting:
+    """What a switch of a pair runs: the pair's routing and its own (identical duplicates once)."""
+    data: dict = {}
+    for routing in routings:
+        for kind, value in routing.model_dump(mode="json", exclude_defaults=True).items():
+            if isinstance(value, dict):
+                data[kind] = {**data.get(kind, {}), **value}
+            else:
+                data[kind] = [*data.get(kind, []), *(v for v in value if v not in data.get(kind, []))]
+    return DeviceRouting.model_validate(data)
+
+
 def vpns_on(device: str, services: list[dict], segments: list[dict], gateways: set[str] | None = None,
             borders: set[str] = frozenset(), ipv6: bool = False) -> set[str]:
     """VPN instances the platform creates on a device, from the orchestrator's view of the
@@ -590,10 +622,7 @@ class RoutingStore:
                 raise SegmentError(f"{name} is not a device of fabric {fabric}")
             devices.append(found)
         if len(names) == 1:
-            peer = await self.peer_of(devices[0])
-            if peer is not None:
-                raise SegmentError(f"{target} is in M-LAG pair {'+'.join(sorted((target, peer)))}: "
-                                   "its routing is the pair's (identical on both leaves)")
+            # A switch of a pair may also have routing of its own, on it alone.
             return names
         if len(names) != 2 or names != sorted(names) or await self.peer_of(devices[0]) != names[1]:
             raise SegmentError(f"{target} is not an M-LAG pair (two leaves, names sorted, joined by '+')")
@@ -607,8 +636,20 @@ class RoutingStore:
         for device in devices:
             await self._check_service_peers(fabric, device, routing)
         await self._check_vpns(fabric, target, routing)
+        current = await self.load(fabric)
+        # The pair's routing and each switch's own end up on the same switch: no object in both
+        # unless identical (one owner per line).
+        if len(devices) == 2:
+            others = {d: current.device(d) for d in devices}
+        else:
+            _, pair, _ = await self.target_of(target)
+            others = {pair: current.device(pair)} if pair != target else {}
+        for other, theirs in others.items():
+            if clash := clashes(routing, theirs):
+                raise SegmentError(f"{', '.join(clash)} also in the routing of {other}, differently: "
+                                   "change or remove it there first")
         try:
-            document = (await self.load(fabric)).with_device(target, routing)
+            document = current.with_device(target, routing)
         except ValueError as exc:
             raise SegmentError(str(exc)) from exc
         await self.save(fabric, document)
@@ -735,7 +776,8 @@ class RoutingStore:
         if fabric is None:
             return
         document = await self.load(fabric)
-        if (target not in document.retired and not set(devices) & set(document.retired_services)
+        if (target not in document.retired and device not in document.retired
+                and not set(devices) & set(document.retired_services)
                 and not set(devices) & set(document.retired_trunks)):
             return
         active = set()
@@ -743,7 +785,10 @@ class RoutingStore:
             found = await self._device(name)
             if status_of(found) == "active":
                 active.add(name)
-        await self.save(fabric, document.verified(device, target, active | {device}))
+        document = document.verified(device, target, active | {device})
+        if target != device:   # a paired switch's own routing: retired once it alone is verified
+            document = document.verified(device, device, {device})
+        await self.save(fabric, document)
 
     async def retire_trunk(self, fabric: str, device: str, trunk: str, members: list[str]) -> None:
         """A trunk was deleted: it and its members stay owned until a verified deploy."""

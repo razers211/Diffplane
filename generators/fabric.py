@@ -710,15 +710,36 @@ def intent_key(device: Any) -> str:
     return pair_key(device.name, peer) if peer else device.name
 
 
+def _merged(docs: list[dict]) -> dict:
+    """A pair's routing plus the switch's own: named objects by name, keyed ones listed once
+    (the orchestrator refuses an object both have unless they are identical)."""
+    out: dict = {}
+    for doc in docs:
+        for kind, value in (doc or {}).items():
+            if isinstance(value, dict):
+                out[kind] = {**out.get(kind, {}), **value}
+            else:
+                out[kind] = [*out.get(kind, []), *(v for v in value if v not in out.get(kind, []))]
+    return out
+
+
+def _routing_of(device: Any, part: str) -> dict:
+    """A switch of an M-LAG pair has the pair's routing (on both switches) and its own (e.g.
+    each ISP link's session on its own border switch); an unpaired one its own."""
+    docs = routing_document(device).get(part) or {}
+    key = intent_key(device)
+    return _merged([docs.get(key) or {}, *([docs.get(device.name) or {}] if key != device.name else [])])
+
+
 def device_routing(device: Any) -> dict:
     """This device's routing intent: prefix_lists, as_path_filters, community_filters,
     route_policies, static_routes, bgp_peers, aggregates, ospf (absent keys are empty)."""
-    return (routing_document(device).get("devices") or {}).get(intent_key(device)) or {}
+    return _routing_of(device, "devices")
 
 
 def retired_routing(device: Any) -> dict:
     """Routing objects deleted from intent, still owned until a verified deploy removed them."""
-    return (routing_document(device).get("retired") or {}).get(intent_key(device)) or {}
+    return _routing_of(device, "retired")
 
 
 def owned(device: Any, kind: str) -> list:

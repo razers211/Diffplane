@@ -30,8 +30,9 @@ async def get_routing_intent(site: str, store: routing_intent.RoutingStore = Dep
 @router.get("/routing/{site}/targets", dependencies=[LOGIN])
 async def routing_targets(site: str, store: routing_intent.RoutingStore = Depends(get_routing_store),
                           netbox: NetBoxClient = Depends(get_netbox)) -> list[dict]:
-    """Where routing intent is set in a fabric: each unpaired device and each M-LAG pair, with
-    its devices and the VPN instances its routing objects may use (besides the global table)."""
+    """Where routing intent is set in a fabric: each unpaired device, each M-LAG pair and each
+    switch of a pair on its own (`pair` names its pair), with its devices and the VPN instances
+    its routing objects may use (besides the global table)."""
     try:
         state = await store.fabric_state(site)   # may adopt legacy segments (a write): first
         found, gateways, borders = await asyncio.gather(netbox.find("dcim/devices", site=site), store.gateways(site),
@@ -39,13 +40,18 @@ async def routing_targets(site: str, store: routing_intent.RoutingStore = Depend
         devices = sorted(found, key=lambda d: d["name"])
         by_name = {d["name"]: d for d in devices}
         targets: dict[str, list[dict]] = {}
+        pairs: dict[str, str] = {}
         for device in devices:
             # From the list itself: a lookup per device made this page take seconds (timing log).
             peer = await store.peer_of(device)
             target = "+".join(sorted((device["name"], peer))) if peer else device["name"]
-            targets.setdefault(target, []).append({"name": device["name"], "role": (device.get("role") or {}).get("slug"),
-                                                   "status": routing_intent.status_of(device)})
-        return [{"target": target, "devices": members,
+            member = {"name": device["name"], "role": (device.get("role") or {}).get("slug"),
+                      "status": routing_intent.status_of(device)}
+            targets.setdefault(target, []).append(member)
+            if peer:
+                targets[device["name"]] = [member]
+                pairs[device["name"]] = target
+        return [{"target": target, "devices": members, "pair": pairs.get(target),
                  "vpns": await store.vpns(site, target, state, by_name, gateways, borders)}
                 for target, members in sorted(targets.items())]
     except segs.SegmentError as exc:

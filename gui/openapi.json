@@ -11686,7 +11686,7 @@
     "/routing/{site}/targets": {
       "get": {
         "summary": "Routing Targets",
-        "description": "Where routing intent is set in a fabric: each unpaired device and each M-LAG pair, with\nits devices and the VPN instances its routing objects may use (besides the global table).",
+        "description": "Where routing intent is set in a fabric: each unpaired device, each M-LAG pair and each\nswitch of a pair on its own (`pair` names its pair), with its devices and the VPN instances\nits routing objects may use (besides the global table).",
         "operationId": "routing_targets_routing__site__targets_get",
         "parameters": [
           {

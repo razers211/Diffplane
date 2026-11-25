@@ -297,3 +297,45 @@ def test_vlan_list():
     assert vlan_list([4093, 3006, 3005]) == "3005 to 3006 4093"
     assert vlan_list([1, 2, 3, 5, 7, 8]) == "1 to 3 5 7 to 8"
     assert vlan_list([10]) == "10"
+
+
+def own_routing(leaf1_peer: bool):
+    """The pair's routing plus each switch's own peer, then leaf1's moved to leaf2."""
+    async def prepare(nb):
+        from orchestrator.routing_intent import DeviceRouting, RoutingStore
+
+        await example_routing(nb)
+        store = RoutingStore(nb)
+        pfx = {"OWN": [{"index": 10, "action": "permit", "prefix": "198.51.100.0/24"}]}
+        await store.set_device("example", "leaf1+leaf2", DeviceRouting.model_validate(
+            {"prefix_lists": pfx, "bgp_peers": [{"address": "192.0.2.1", "asn": 65100}]}))
+        peer = {"address": "192.0.2.5", "asn": 65200, "export_prefix_list": "OWN"}
+        await store.set_device("example", "leaf1" if leaf1_peer else "leaf2",
+                               DeviceRouting.model_validate({"prefix_lists": pfx, "bgp_peers": [peer]}))
+        if not leaf1_peer:   # it was leaf1's first: retired there
+            await store.set_device("example", "leaf1", DeviceRouting.model_validate(
+                {"prefix_lists": pfx, "bgp_peers": [peer]}))
+            await store.set_device("example", "leaf1", DeviceRouting())
+            await store.set_device("example", "leaf2", DeviceRouting.model_validate({"prefix_lists": pfx, "bgp_peers": [peer]}))
+    return prepare
+
+
+@cache
+def own(leaf1_peer: bool):
+    return {d.hostname: d for d in devices_from_fabric(EXAMPLE, prepare=own_routing(leaf1_peer))}
+
+
+def test_a_switchs_own_peer_is_on_it_alone_beside_the_pairs():
+    config = render(own(True)["leaf1"])
+    assert "peer 192.0.2.1 as-number 65100" in config and "peer 192.0.2.5 as-number 65200" in config
+    assert config.count("ip ip-prefix OWN index 10 permit 198.51.100.0 24") == 1   # identical in both: once
+    assert patch_to(config, own(True)["leaf1"]) == ""
+
+
+def test_moving_a_peer_to_the_other_switch_removes_it_from_the_first():
+    before = render(own(True)["leaf1"])
+    after = own(False)["leaf1"]
+    lines = [line.strip() for line in patch_to(before, after).splitlines()]
+    assert "undo peer 192.0.2.5" in lines, lines
+    assert not any("192.0.2.1" in line for line in lines)   # the pair's peer stays
+    assert "undo ip ip-prefix OWN index 10" not in " ".join(lines)   # still the pair's

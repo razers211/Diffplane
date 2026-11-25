@@ -76,6 +76,7 @@ export interface RoutingTarget {
   target: string; // a device, or an M-LAG pair "<leaf>+<leaf>"
   devices: { name: string; role: string | null; status: string | null }[];
   vpns: string[]; // VPN instances its routing objects may use, besides the global table
+  pair?: string | null; // a switch of an M-LAG pair on its own: its pair's target
 }
 
 export interface ImportReport {

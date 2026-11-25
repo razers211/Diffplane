@@ -2866,8 +2866,9 @@ export interface paths {
         };
         /**
          * Routing Targets
-         * @description Where routing intent is set in a fabric: each unpaired device and each M-LAG pair, with
-         *     its devices and the VPN instances its routing objects may use (besides the global table).
+         * @description Where routing intent is set in a fabric: each unpaired device, each M-LAG pair and each
+         *     switch of a pair on its own (`pair` names its pair), with its devices and the VPN instances
+         *     its routing objects may use (besides the global table).
          */
         get: operations["routing_targets_routing__site__targets_get"];
         put?: never;

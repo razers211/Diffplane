@@ -130,7 +130,8 @@ def plan(current: dict, snapshot: dict, scope: Scope) -> dict:
     cur_routing = (current.get("routing") or {}).get("devices") or {}
     snap_routing = (snapshot.get("routing") or {}).get("devices") or {}
     targets = sorted(t for t in set(cur_routing) | set(snap_routing)
-                     if (scope.fabric or t == scope.target) and cur_routing.get(t) != snap_routing.get(t))
+                     if (scope.fabric or t == scope.target or t in scope.devices)   # the pair's and each switch's own
+                     and cur_routing.get(t) != snap_routing.get(t))
     for target in targets:
         stripped = _vpn_free(cur_routing.get(target) or {})
         if stripped != (cur_routing.get(target) or {}):

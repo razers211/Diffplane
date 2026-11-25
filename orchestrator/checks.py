@@ -161,9 +161,13 @@ def _cycle(tables: dict[str, list[tuple]], vpn: str, address) -> list[str] | Non
 
 def route_cycles(model: Model) -> list[dict]:
     found, seen = [], set()
-    targets = ((model.routing or {}).get("devices") or {}) or {"": {}}
-    for target, routing in sorted(targets.items()):
-        tables = _tables(model, (routing or {}).get("static_routes") or [])
+    # Per switch: its pair's static routes and its own meet there.
+    by_switch: dict[str, list] = {}
+    for target, routing in ((model.routing or {}).get("devices") or {}).items():
+        for switch in target.split("+"):
+            by_switch.setdefault(switch, []).extend((routing or {}).get("static_routes") or [])
+    for target, routes in sorted((by_switch or {"": []}).items()):
+        tables = _tables(model, routes)
         for vpn, routes in sorted(tables.items()):
             for route in routes:
                 loop = _cycle(tables, vpn, route[0].network_address)

@@ -26,7 +26,7 @@ from pydantic import ValidationError
 
 from generators.fabric import is_segment_vpn
 from orchestrator import documents
-from orchestrator.routing_intent import DeviceRouting, status_of
+from orchestrator.routing_intent import DeviceRouting, combined, status_of
 
 MANAGEMENT_VPN = "_management_vpn_"
 
@@ -426,7 +426,15 @@ def drop_dangling(new: DeviceRouting, intent: DeviceRouting) -> tuple[DeviceRout
             return DeviceRouting.model_validate(data), dropped
 
 
-def common(results: list[DeviceRouting]) -> tuple[DeviceRouting, list[str]]:
+def identities(routing: DeviceRouting) -> set:
+    """Every object's identity: a name or a key."""
+    named = {n for kind in ("prefix_lists", "as_path_filters", "community_filters", "route_policies")
+             for n in getattr(routing, kind)}
+    return named | {item.key for kind in ("static_routes", "bgp_peers", "aggregates", "ospf")
+                    for item in getattr(routing, kind)}
+
+
+def common(results: list[DeviceRouting], known: set = frozenset()) -> tuple[DeviceRouting, list[str]]:
     """What every leaf of an M-LAG pair has identically (a pair's routing is
     identical on both leaves); objects present on some leaves only, or differing, are reported."""
     if len(results) == 1:
@@ -441,7 +449,7 @@ def common(results: list[DeviceRouting]) -> tuple[DeviceRouting, list[str]]:
             values = [getattr(r, kind).get(name) for r in results]
             if all(v == values[0] for v in values) and values[0] is not None:
                 named[kind][name] = values[0]
-            else:
+            elif name not in known:   # in a switch's own routing
                 differs.append(f"{kind.replace('_', ' ')[:-1]} {name} (differs between the pair's leaves)")
     keyed = {}
     for kind in ("static_routes", "bgp_peers", "aggregates", "ospf"):
@@ -451,7 +459,7 @@ def common(results: list[DeviceRouting]) -> tuple[DeviceRouting, list[str]]:
             values = [m.get(key) for m in maps]
             if all(v == values[0] for v in values) and values[0] is not None:
                 keyed[kind].append(values[0])
-            else:
+            elif key not in known:
                 differs.append(f"{kind.replace('_', ' ')[:-1]} {' '.join(str(k) for k in key[1:] if k)} "
                                "(differs between the pair's leaves)")
     return DeviceRouting.model_construct(**named, **keyed), differs
@@ -558,11 +566,15 @@ class RoutingImporter:
                     return self._keep(report)
                 texts[peer] = text
             results = [routing_objects(text, await self.exclusions(fabric, name)) for name, text in sorted(texts.items())]
-            found_routing, differs = common([r.routing for r in results])
             async with self._writing:   # load, merge and write the fabric's document as one step
                 document = await self.store.load(fabric)
                 intent = document.device(target)
-                new = new_objects(found_routing, intent, document.retired.get(target, DeviceRouting()))
+                # Each switch's own routing is on one switch: not a difference to report, and
+                # never adopted into the pair's.
+                own = [document.device(d) for d in texts] + [document.retired.get(d, DeviceRouting()) for d in texts]
+                found_routing, differs = common([r.routing for r in results], known=set().union(*map(identities, own)))
+                new = new_objects(found_routing, combined(intent, *own[:len(texts)]),
+                                  combined(document.retired.get(target, DeviceRouting()), *own[len(texts):]))
                 new, dropped = drop_dangling(new, intent)
                 if not new.is_empty():
                     await self.store.set_device(fabric, target, merged(intent, new))

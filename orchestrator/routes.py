@@ -431,12 +431,16 @@ def local_asn(text: str) -> int | None:
 # -- what the pages ask for ---------------------------------------------------------------------
 
 async def intent_of(store, name: str) -> tuple[str | None, DeviceRouting]:
-    """The routing intent that applies to a device: its pair's, or its own."""
+    """The routing intent that applies to a device: its pair's and its own."""
+    from orchestrator.routing_intent import combined
+
     fabric, target, _ = await store.target_of(name)
     if fabric is None:
         return None, DeviceRouting()
     document = await store.load(fabric)
-    return target, document.devices.get(target) or document.devices.get(name) or DeviceRouting()
+    if target == name:
+        return target, document.device(name)
+    return target, combined(document.device(target), document.device(name))
 
 
 async def routing_table(reader: RouteReader, name: str) -> dict:

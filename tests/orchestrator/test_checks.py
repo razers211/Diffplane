@@ -38,7 +38,7 @@ def test_a_static_route_loop_is_an_error():
                {"vpn": "web-500", "prefix": "10.8.0.0/16", "next_hop": "10.9.0.1"}]
     found = run(model(routing={"devices": {"leaf1+leaf2": {"static_routes": statics}}}))
     assert checks(found) == [(ERROR, "route-cycle")]
-    assert "on leaf1+leaf2" in found[0]["text"] and "static 10.9.0.0/16 via 10.8.0.1 in web-500" in found[0]["text"]
+    assert "on leaf1:" in found[0]["text"] and "static 10.9.0.0/16 via 10.8.0.1 in web-500" in found[0]["text"]
     # The same routes on two different switches do not meet: no loop.
     split = {"leaf1": {"static_routes": statics[:1]}, "leaf3": {"static_routes": statics[1:]}}
     assert run(model(routing={"devices": split})) == []

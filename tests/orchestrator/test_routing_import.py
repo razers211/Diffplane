@@ -236,6 +236,20 @@ def test_a_pair_adopts_only_what_both_leaves_have_identically():
     assert all(s.vpn is None for s in intent.static_routes) and intent.ospf == []
 
 
+def test_a_switchs_own_routing_is_neither_reported_nor_adopted_for_the_pair():
+    leaf2 = RUNNING.replace("ip route-static 10.61.0.0 255.255.0.0 192.0.2.254 preference 20\n", "")
+    nb, importer = pair_importer({"leaf1": RUNNING, "leaf2": leaf2})
+    asyncio.run(RoutingStore(nb).set_device("example", "leaf1", DeviceRouting.model_validate(
+        {"static_routes": [{"prefix": "10.61.0.0/16", "next_hop": "192.0.2.254", "preference": 20}]})))
+
+    report = asyncio.run(importer.run("leaf1"))
+    document = asyncio.run(RoutingStore(nb).load("example"))
+
+    assert report.error is None
+    assert not any("10.61.0.0/16" in u for u in report.unmanaged), report.unmanaged
+    assert {str(s.prefix) for s in document.device("leaf1+leaf2").static_routes} == {"10.60.0.0/16"}
+    assert [str(s.prefix) for s in document.device("leaf1").static_routes] == ["10.61.0.0/16"]
+
 def test_an_unreachable_peer_stops_the_import_for_the_pair():
     nb, importer = pair_importer({"leaf1": RUNNING, "leaf2": TimeoutError("no answer")})
 
