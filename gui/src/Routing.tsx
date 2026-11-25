@@ -79,9 +79,11 @@ export function Services({
   }, [form.device]);
 
   const firstFirewall = services.find((s) => s.kind === "firewall")?.name;
-  // An existing VPN instance to join: another service's on this switch, or a routed segment's.
+  // An existing VPN instance to join: another service's (made on this switch too when it is not
+  // there yet: a second ISP link on the other border spine), or a routed segment's.
   const instanceOf = (s: Service) => s.vrf ?? s.name;
-  const sharedHere = [...new Set(services.filter((s) => (s.devices ?? [s.device]).includes(form.device)).map(instanceOf))]
+  const here = new Set(services.filter((s) => (s.devices ?? [s.device]).includes(form.device)).map(instanceOf));
+  const sharedHere = [...new Set(services.map(instanceOf))].sort()
     .filter((v) => !segments.some((g) => `${g.name}-${g.bd_id}` === v));
   const segmentInstances = segments.filter((g) => g.routing).map((g) => ({ vrf: `${g.name}-${g.bd_id}`, name: g.name }));
   const set = (field: keyof Service) => (e: { target: { value: string } }) =>
@@ -276,13 +278,13 @@ export function Services({
         <label>
           VLAN <input value={vlan} onChange={(e) => setVlan(e.target.value)} inputMode="numeric" placeholder="3000" />
         </label>
-        <label title="Its own new VPN instance named after it, or an existing one: another service's on this switch, or a routed segment's (a firewall there can only be that segment's exit)">
+        <label title="Its own new VPN instance named after it, or an existing one: another service's (created on this switch too if it is not here yet, with the same route distinguisher VLAN), or a routed segment's (a firewall there can only be that segment's exit)">
           VPN instance
           <select value={form.vrf ?? ""} onChange={(e) => setForm({ ...form, vrf: e.target.value || null })} disabled={!form.device}>
             <option value="">its own (new)</option>
             {sharedHere.length > 0 && (
               <optgroup label="Another service's">
-                {sharedHere.map((v) => <option key={v} value={v}>{v}</option>)}
+                {sharedHere.map((v) => <option key={v} value={v}>{v}{here.has(v) ? "" : " (new on this switch)"}</option>)}
               </optgroup>
             )}
             {segmentInstances.length > 0 && (

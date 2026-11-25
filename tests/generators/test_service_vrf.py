@@ -90,3 +90,27 @@ def test_the_instance_outlives_its_maker_and_only_its_session_goes():
     assert any(line.strip() == "undo peer 10.255.0.2" for line in lines), "\n".join(lines)   # FW2 keeps the BGP block
     assert not any(line.strip() in ("undo ip vpn-instance FW", "undo vpn-instance FW") for line in lines), lines
     assert patch_to(render(after), after) == ""
+
+
+async def across_switches(nb):
+    """A second ISP link on the other leaf of the pair joins the first one's instance."""
+    from orchestrator.routing import Routing
+
+    await shared(nb)
+    await Routing(nb).create_service("example", "ISP_B", "leaf2", "10GE1/0/5", 3008, "10.255.8.1/30", "10.255.8.2",
+                                     kind="isp", vrf="FW")
+
+
+def test_another_switch_gets_the_shared_instance_with_its_own_rd():
+    devices = {d.hostname: d for d in devices_from_fabric(EXAMPLE, prepare=across_switches)}
+    second = devices["leaf2"]
+    config = render(second)
+    own = next(i for i in second.interfaces if i.name == "LoopBack0").ip_addresses[0].address.split("/")[0]
+    assert own != "10.0.0.3"
+    assert f"route-distinguisher {own}:3000" in block(config, "ip vpn-instance FW")   # its loopback, the maker's VLAN
+    assert "ip binding vpn-instance FW" in block(config, "interface Vlanif3008")
+    assert "ip vpn-instance ISP_B" not in config
+    assert patch_to(render(second), second) == ""
+    first = render(devices["leaf1"])
+    assert "route-distinguisher 10.0.0.3:3000" in block(first, "ip vpn-instance FW")   # unchanged there
+    assert "Vlanif3008" not in first

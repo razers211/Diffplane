@@ -170,16 +170,21 @@ class Routing:
     async def _joined(self, fabric: str, name: str, vrf: str | None, kind: str, asn: int | None,
                       devices: list[str], six: dict | None, others: list[dict]) -> dict | None:
         """The VPN instance a new service joins, as stored in `service_vrf`;
-        None: its own. Another service's instance must be on each of its switches already (an
-        instance is per switch) and keeps its RD; a routed segment's is the segment's own."""
+        None: its own. Another service's instance keeps its RD VLAN; on a switch that does not
+        have it yet (e.g. a second ISP link on the other border spine) the service creates it
+        there too, RD <that switch's LoopBack0>:<RD VLAN>, so no other service there may use
+        that VLAN. A routed segment's instance is the segment's own."""
         instance = (vrf or "").strip() or name
         sharing = [s for s in others if s["vrf"] == instance]
         if sharing:
+            rd_vlan = sharing[0]["rd_vlan"]
             there = {d for s in sharing for d in s["devices"]}
-            if missing := [d for d in devices if d not in there]:
-                raise SegmentError(f"VPN instance {instance} is not on {' and '.join(missing)}: it exists only where "
-                                   f"its services are ({', '.join(sorted(there))})")
-            return {"name": instance, "rd_vlan": sharing[0]["rd_vlan"]}
+            for other in others:
+                new = (set(devices) - there) & set(other["devices"])
+                if new and other["vrf"] != instance and rd_vlan in (other["vlan"], other["rd_vlan"]):
+                    raise SegmentError(f"VPN instance {instance}'s route distinguisher uses VLAN {rd_vlan}, which "
+                                       f"service {other['name']} already uses on {' and '.join(sorted(new))}")
+            return {"name": instance, "rd_vlan": rd_vlan}
         if instance == name:
             return None
         from orchestrator.routing_intent import RoutingStore, segment_vpn

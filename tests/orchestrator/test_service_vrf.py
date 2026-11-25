@@ -36,13 +36,18 @@ def test_joining_another_services_instance_keeps_its_rd_after_it_goes(nb):  # no
         run(Segments(nb).create("example", "seg", 13001, 3001))
 
 
-def test_an_instance_is_per_switch_and_must_exist(nb):  # noqa: F811
+def test_another_switch_joins_an_instance_unless_its_rd_vlan_is_taken_there(nb):  # noqa: F811
     r = Routing(nb)
     run(r.create_service("example", "FW", **FW))
-    with pytest.raises(SegmentError, match="not on leaf2"):
+    run(r.create_service("example", "THERE", **{**INSIDE, "device": "leaf2", "vlan": FW["vlan"]}))
+    with pytest.raises(SegmentError, match="uses VLAN 3001, which service THERE already uses on leaf2"):
         run(r.create_service("example", "ISP", vrf="FW", **{**ISP, "device": "leaf2"}))
+    run(r.delete_service("example", "THERE"))
+    run(r.create_service("example", "ISP", vrf="FW", **{**ISP, "device": "leaf2"}))
+    isp = by_name(nb)["ISP"]
+    assert (isp["vrf"], isp["rd_vlan"], isp["devices"]) == ("FW", 3001, ["leaf2"])
     with pytest.raises(SegmentError, match="no service or routed segment"):
-        run(r.create_service("example", "ISP", vrf="NOPE", **ISP))
+        run(r.create_service("example", "ISP2", vrf="NOPE", **{**ISP, "port": "10GE1/0/13"}))
 
 
 def test_a_firewall_in_a_segments_instance_is_that_segments_alone(nb):  # noqa: F811
