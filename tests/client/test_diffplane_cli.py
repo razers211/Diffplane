@@ -33,7 +33,7 @@ class Fake:
         if isinstance(answer, int):
             raise urllib.error.HTTPError(request.full_url, answer, "refused", {},
                                          io.BytesIO(b'{"detail": "approving this deploy needs the approver role"}'))
-        return io.BytesIO(json.dumps(answer).encode())
+        return io.BytesIO(answer.encode() if isinstance(answer, str) else json.dumps(answer).encode())
 
 
 @pytest.fixture(autouse=True)
@@ -139,11 +139,37 @@ def test_https_only():
         diffplane.Client("http://diffplane.test:8000")
 
 
+def test_intent_export_and_import(capsys, tmp_path):
+    yaml_text = "kind: diffplane-intent\nversion: 1\nfabric: dc-a\n"
+    routes = {("GET", "/fabrics/dc-a/intent"): yaml_text}
+    fake = Fake(routes)
+    out_file = tmp_path / "dc-a.yaml"
+    code = diffplane.main(["-q", "intent", "export", "--fabric", "dc-a", "-o", str(out_file)],
+                          client=diffplane.Client("https://d.test", opener=fake))
+    assert code == 0 and out_file.read_text() == yaml_text
+
+    plan = {"fabric": "dc-a", "operations": [{"kind": "create_segment", "text": "create segment db (VNI 10600)"}],
+            "notes": [], "ignored": ["QoS"]}
+    code, out, fake = run({("POST", "/fabrics/dc-a/intent/preview"): plan},
+                          "intent", "import", "--fabric", "dc-a", str(out_file), capsys=capsys)
+    assert code == 1 and fake.seen == [("POST", "/fabrics/dc-a/intent/preview", {"yaml": yaml_text})]
+    assert "1. create segment db (VNI 10600)" in out and "left as it is (set from the GUI): QoS" in out
+
+    done = {**plan, "done": ["create segment db (VNI 10600)"], "failed": None, "remaining": []}
+    code, out, fake = run({("POST", "/fabrics/dc-a/intent/preview"): plan, ("POST", "/fabrics/dc-a/intent/import"): done},
+                          "intent", "import", "--fabric", "dc-a", str(out_file), "--apply", capsys=capsys)
+    assert code == 0 and fake.seen[1][2] == {"yaml": yaml_text, "expected": 1}
+    refused = {**done, "done": [], "failed": {"text": "create segment db", "error": "VNI taken"}, "remaining": []}
+    code, out, _ = run({("POST", "/fabrics/dc-a/intent/preview"): plan, ("POST", "/fabrics/dc-a/intent/import"): refused},
+                       "intent", "import", "--fabric", "dc-a", str(out_file), "--apply", capsys=capsys)
+    assert code == 2 and "refused: create segment db: VNI taken" in out
+
+
 def test_every_call_is_a_route_of_the_schema():
     """Last in this file: CALLS holds what the tests above sent."""
     schema = json.loads((Path(__file__).parents[2] / "gui" / "openapi.json").read_text())
     routes = [(m.upper(), re.compile("^" + re.sub(r"\{[^}]+\}", "[^/]+", p) + "$"))
               for p, ops in schema["paths"].items() for m in ops]
-    assert len(CALLS) >= 11   # every command and login
+    assert len(CALLS) >= 14   # every command and login
     for method, path in sorted(CALLS):
         assert any(m == method and r.match(path) for m, r in routes), f"{method} {path} is not in the API"

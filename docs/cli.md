@@ -42,6 +42,8 @@ fabric's deploys. Limit the account to the fabrics it works on.
 | `diffplane deploy prepare --fabric F` | computes the patches for approval and prints them; nothing is sent to a switch |
 | `diffplane deploy approve ID [--window-start T --window-end T]` | approves, then follows the rollout; with a window, schedules it (ISO 8601 times with a zone) |
 | `diffplane deploy show ID`, `deploy list`, `deploy cancel ID` | a job with its patches and checks, recent jobs, cancel a scheduled job or stop one after its wave |
+| `diffplane intent export --fabric F [-o FILE]` | the fabric's intent as YAML |
+| `diffplane intent import --fabric F FILE [--apply]` | the changes to intent the file would make, in order (exit 1 if there are any); `--apply` makes them |
 
 `--json` prints the API's answers as they are (the shapes are in `orchestrator/answers.py` and
 the OpenAPI schema at `/openapi.json`). Progress lines go to stderr; `-q` silences them. Any
@@ -63,3 +65,30 @@ diffplane deploy prepare --fabric dc-a
 ```
 
 The commands wait for their job without a time limit: wrap them in the CI system's own timeout.
+
+## Intent in git
+
+`diffplane intent export` writes what operators set for a fabric: segments with their routing
+and port attachments, services, server Eth-Trunks, routing intent, port settings and the
+fabric-wide settings (NTP, SNMP, gateway MAC, NetStream, syslog, microsegmentation, QoS,
+protection), plus its DC links and what an import kept as found. Devices, cabling and addressing
+are not intent and are not in it. Secret values are masked.
+
+`diffplane intent import` plans the changes that bring the fabric's intent to the file's, in the
+order a rollback uses, and with `--apply` makes them one by one through the orchestrator's own
+checks, stopping at the first refusal. It changes intent only: the switches change through the
+usual diff, approval and deploy. A file may change segments, services, server trunks, routing
+intent, NTP, the SNMP location and contact, the gateway MAC, NetStream and syslog. The other
+parts are set from the GUI by the people allowed to (microsegmentation, QoS, protection, port
+settings, SNMPv3 readers, DC links, overrides): the import leaves them as they are and says so.
+The file must name the fabric it is imported into.
+
+A flow for a fabric kept in git:
+
+1. Export once and commit the file.
+2. A change is a pull request on the file. CI runs `diffplane intent import --fabric dc-a
+   dc-a.yaml` and shows its plan in the review (exit 1 means there is something to change).
+3. Once merged, a job runs it with `--apply`, then `diffplane deploy prepare --fabric dc-a`;
+   an approver reads the patches and approves.
+4. Changes made in the GUI meanwhile show up in the next plan as changes the file would undo:
+   export again and commit them, or let the file win.

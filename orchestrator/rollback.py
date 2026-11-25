@@ -396,17 +396,25 @@ async def apply(nb, store, fabric: str, snapshot_id: int, device: str | None, ex
     """Restore the rollback point: plan again now, check it is still what the person saw
     (`expected` operations), then run each operation through the orchestrator's own checks,
     stopping at the first refusal. What was done stays done (it is intent; the pending bar shows it)."""
+    from orchestrator.segments import SegmentError
+
+    planned = await preview(nb, store, fabric, snapshot_id, device)
+    if len(planned["operations"]) != expected:
+        raise SegmentError(f"intent changed since the preview ({len(planned['operations'])} operations now, "
+                           f"{expected} shown): preview again")
+    return await execute(nb, fabric, planned)
+
+
+async def execute(nb, fabric: str, planned: dict) -> dict:
+    """Run a plan's operations in order, each through the orchestrator's own checks, stopping at
+    the first refusal (rollbacks, and intent files: orchestrator/intent_file.py)."""
     from orchestrator import fabric_ntp
     from orchestrator.routing import Routing
     from orchestrator.routing_intent import DeviceRouting, RoutingStore
     from orchestrator.segments import SegmentError, Segments
     from orchestrator.trunks import Trunks
 
-    planned = await preview(nb, store, fabric, snapshot_id, device)
     ops = planned["operations"]
-    if len(ops) != expected:
-        raise SegmentError(f"intent changed since the preview ({len(ops)} operations now, {expected} shown): "
-                           "preview again")
     segments, routing, trunks, routing_store = Segments(nb), Routing(nb), Trunks(nb), RoutingStore(nb)
 
     async def run(o: dict) -> None:

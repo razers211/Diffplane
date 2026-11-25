@@ -1691,6 +1691,68 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/fabrics/{site}/intent": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Intent
+         * @description The fabric's intent as YAML (orchestrator/intent_file.py), to keep in git.
+         */
+        get: operations["export_intent_fabrics__site__intent_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/fabrics/{site}/intent/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview Intent
+         * @description What importing the file would change in intent, in order; nothing is written.
+         */
+        post: operations["preview_intent_fabrics__site__intent_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/fabrics/{site}/intent/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Import Intent
+         * @description Bring intent to the file's: the operations the preview showed, each through the
+         *     orchestrator's own checks, stopping at the first refusal. Switches change only through the
+         *     usual review, approval and deploy.
+         */
+        post: operations["import_intent_fabrics__site__intent_import_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/devices/{name}/trunks": {
         parameters: {
             query?: never;
@@ -3775,6 +3837,13 @@ export interface components {
              */
             architecture: "symmetric" | "centralized";
         };
+        /** Failed */
+        Failed: {
+            /** Text */
+            text: string;
+            /** Error */
+            error: string;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -3833,6 +3902,45 @@ export interface components {
         ImportStart: {
             /** Addresses */
             addresses: string[];
+        };
+        /** IntentImport */
+        IntentImport: {
+            /** Yaml */
+            yaml: string;
+            /** Expected */
+            expected: number;
+        };
+        /** IntentImported */
+        IntentImported: {
+            /** Fabric */
+            fabric: string;
+            /** Operations */
+            operations: components["schemas"]["Operation"][];
+            /** Notes */
+            notes: string[];
+            /** Ignored */
+            ignored: string[];
+            /** Done */
+            done: string[];
+            failed: components["schemas"]["Failed"] | null;
+            /** Remaining */
+            remaining: string[];
+        };
+        /** IntentPlan */
+        IntentPlan: {
+            /** Fabric */
+            fabric: string;
+            /** Operations */
+            operations: components["schemas"]["Operation"][];
+            /** Notes */
+            notes: string[];
+            /** Ignored */
+            ignored: string[];
+        };
+        /** IntentText */
+        IntentText: {
+            /** Yaml */
+            yaml: string;
         };
         /** InventorySwitch */
         InventorySwitch: {
@@ -4188,6 +4296,15 @@ export interface components {
             servers: string[];
             /** Vpn Instance */
             vpn_instance?: string | null;
+        };
+        /** Operation */
+        Operation: {
+            /** Kind */
+            kind: string;
+            /** Text */
+            text: string;
+        } & {
+            [key: string]: unknown;
         };
         /** OspfAuthRoll */
         OspfAuthRoll: {
@@ -8498,6 +8615,113 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     }[];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_intent_fabrics__site__intent_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                site: string;
+            };
+            cookie?: {
+                fabric_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/yaml": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_intent_fabrics__site__intent_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                site: string;
+            };
+            cookie?: {
+                fabric_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IntentText"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntentPlan"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    import_intent_fabrics__site__intent_import_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                site: string;
+            };
+            cookie?: {
+                fabric_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IntentImport"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntentImported"];
                 };
             };
             /** @description Validation Error */

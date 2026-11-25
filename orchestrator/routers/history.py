@@ -3,11 +3,13 @@
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import Response
 from pydantic import BaseModel
 
 from orchestrator.annet import AnnetError
 from orchestrator import jobs as diff_jobs, segments as segs
-from orchestrator import backups, intent_snapshots
+from orchestrator import backups, intent_file, intent_snapshots
+from orchestrator.answers import IntentImported, IntentPlan
 from orchestrator.access import Access
 from orchestrator.auth import audit
 from orchestrator.auth import Accounts
@@ -209,4 +211,62 @@ async def apply_rollback(site: str, snapshot_id: int, body: RollbackRequest, use
     if result["failed"]:
         await audit(accounts.sessions, user, "fabric.rollback-stopped",
                     detail=f"{site} {scope} at: {result['failed']['text']}: {result['failed']['error']}")
+    return result
+
+
+# -- intent as a file (GitOps): exported, imported back as checked intent operations ------------
+
+@router.get("/fabrics/{site}/intent", dependencies=[LOGIN], response_class=Response,
+            responses={200: {"content": {"application/yaml": {}}}})
+async def export_intent(site: str, netbox: NetBoxClient = Depends(get_netbox)) -> Response:
+    """The fabric's intent as YAML (orchestrator/intent_file.py), to keep in git."""
+    try:
+        text = await intent_file.export(netbox, site)
+    except segs.SegmentError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except NetBoxError as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+    return Response(text, media_type="application/yaml",
+                    headers={"Content-Disposition": f'attachment; filename="{site}-intent.yaml"'})
+
+
+class IntentText(BaseModel):
+    yaml: str
+
+
+class IntentImport(IntentText):
+    expected: int                 # how many operations the preview showed
+
+
+@router.post("/fabrics/{site}/intent/preview", dependencies=[LOGIN, OPERATE], response_model=IntentPlan,
+             response_model_exclude_unset=True)
+async def preview_intent(site: str, body: IntentText, netbox: NetBoxClient = Depends(get_netbox)) -> dict:
+    """What importing the file would change in intent, in order; nothing is written."""
+    try:
+        return await intent_file.preview(netbox, site, body.yaml)
+    except segs.SegmentError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except NetBoxError as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+
+
+@router.post("/fabrics/{site}/intent/import", dependencies=INTENT_WRITE, response_model=IntentImported,
+             response_model_exclude_unset=True)
+async def import_intent(site: str, body: IntentImport, user: str = Depends(current_user),
+                        netbox: NetBoxClient = Depends(get_netbox), accounts: Accounts = Depends(get_accounts)) -> dict:
+    """Bring intent to the file's: the operations the preview showed, each through the
+    orchestrator's own checks, stopping at the first refusal. Switches change only through the
+    usual review, approval and deploy."""
+    try:
+        result = await intent_file.apply(netbox, site, body.yaml, body.expected)
+    except segs.SegmentError as exc:
+        raise HTTPException(status_code=409 if "preview again" in str(exc) else 400, detail=str(exc))
+    except NetBoxError as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+    if result["done"]:
+        await audit(accounts.sessions, user, "fabric.intent-import",
+                    detail=f"{site}: {len(result['done'])} of {len(result['operations'])} operations")
+    if result["failed"]:
+        await audit(accounts.sessions, user, "fabric.intent-import-stopped",
+                    detail=f"{site} at: {result['failed']['text']}: {result['failed']['error']}")
     return result

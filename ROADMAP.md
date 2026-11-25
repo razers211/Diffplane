@@ -20,6 +20,9 @@
   reachability ("why can't A reach B?"), a NOC wall view.
 - Platform: roles with per-fabric limits, Active Directory and RADIUS sign-in, alerting by email
   or webhook, high availability on two servers and a witness.
+- Automation: typed answers on the main API routes, a `diffplane` command-line client for CI,
+  and a fabric's intent exported as a YAML file to keep in git and imported back as checked
+  intent changes ([Command line](docs/cli.md)).
 
 ## Needs verification on more hardware
 

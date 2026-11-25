@@ -5,6 +5,8 @@
     diffplane diff --fabric dc-a               # check the switches against intent now
     diffplane deploy prepare --fabric dc-a     # patches for approval; nothing is sent to a switch
     diffplane deploy approve 42                # an approver's account (or an operator allowed to)
+    diffplane intent export --fabric dc-a > dc-a.yaml   # the fabric's intent, to keep in git
+    diffplane intent import --fabric dc-a dc-a.yaml     # what it would change; --apply to change it
 
 The password comes from DIFFPLANE_PASSWORD or a prompt, never from an argument. The orchestrator
 decides everything (roles, fabric limits, deploy rules): the client only asks. HTTPS is verified
@@ -48,7 +50,7 @@ class Client:
             urllib.request.HTTPSHandler(context=ssl.create_default_context(cafile=ca)),
             urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar())).open
 
-    def call(self, method: str, path: str, query: dict | None = None, body: Any = None) -> Any:
+    def call(self, method: str, path: str, query: dict | None = None, body: Any = None, raw: bool = False) -> Any:
         query = {k: v for k, v in (query or {}).items() if v is not None}
         target = self.url + urllib.parse.quote(path) + (f"?{urllib.parse.urlencode(query)}" if query else "")
         data = None if body is None else json.dumps(body).encode()
@@ -63,7 +65,7 @@ class Client:
             except (ValueError, AttributeError):
                 detail = exc.reason
             raise ApiError(exc.code, detail if isinstance(detail, str) else json.dumps(detail)) from None
-        return json.loads(text) if text else None
+        return text.decode() if raw else json.loads(text) if text else None
 
     def login(self, username: str, password: str) -> dict:
         return self.call("POST", "/auth/login", body={"username": username, "password": password})
@@ -185,6 +187,46 @@ def cmd_deploy_cancel(api: Client, args, out) -> int:
     return cmd_deploy_show(api, args, out)
 
 
+def cmd_intent_export(api: Client, args, out) -> int:
+    text = api.call("GET", f"/fabrics/{args.fabric}/intent", raw=True)
+    if args.output:
+        with open(args.output, "w", encoding="utf-8") as f:
+            f.write(text)
+    else:
+        sys.stdout.write(text)
+    return 0
+
+
+def _plan_text(plan: dict) -> str:
+    lines = [f"{len(plan['operations'])} change(s) to {plan['fabric']}'s intent" + (":" if plan["operations"] else "")]
+    lines += [f"  {i}. {o['text']}" for i, o in enumerate(plan["operations"], 1)]
+    lines += [f"note: {n}" for n in plan["notes"]]
+    lines += [f"left as it is (set from the GUI): {', '.join(plan['ignored'])}"] if plan["ignored"] else []
+    return "\n".join(lines)
+
+
+def cmd_intent_import(api: Client, args, out) -> int:
+    """Preview: exit 0 if the fabric's intent is already the file's, 1 if it is not. With --apply:
+    exit 0 once every operation is done, 2 if the orchestrator refused one."""
+    with open(args.file, encoding="utf-8") as f:
+        text = f.read()
+    plan = api.call("POST", f"/fabrics/{args.fabric}/intent/preview", body={"yaml": text})
+    if not args.apply or not plan["operations"]:
+        out(plan, lambda: _plan_text(plan) + ("\nnothing written; --apply makes these changes" if plan["operations"] else ""))
+        return 1 if plan["operations"] else 0
+    done = api.call("POST", f"/fabrics/{args.fabric}/intent/import",
+                    body={"yaml": text, "expected": len(plan["operations"])})
+
+    def summary() -> str:
+        lines = [f"done: {t}" for t in done["done"]]
+        if done["failed"]:
+            lines += [f"refused: {done['failed']['text']}: {done['failed']['error']}"]
+            lines += [f"not done: {t}" for t in done["remaining"]]
+        return "\n".join(lines + ["intent changed: review and deploy it (diffplane deploy prepare)" if done["done"] else ""])
+    out(done, summary)
+    return 2 if done["failed"] else 0
+
+
 def parser() -> argparse.ArgumentParser:
     env = os.environ.get
     p = argparse.ArgumentParser(prog="diffplane", description=__doc__.split("\n\n")[0])
@@ -231,6 +273,16 @@ def parser() -> argparse.ArgumentParser:
     q.add_argument("--limit", type=int, default=20)
     q.set_defaults(run=cmd_deploy_list)
 
+    intent = sub.add_parser("intent", help="a fabric's intent as a YAML file").add_subparsers(dest="action", required=True)
+    q = intent.add_parser("export", help="write the fabric's intent as YAML")
+    q.add_argument("--fabric", required=True)
+    q.add_argument("--output", "-o", help="this file (default: stdout)")
+    q.set_defaults(run=cmd_intent_export)
+    q = intent.add_parser("import", help="what the file would change in intent; --apply to change it")
+    q.add_argument("--fabric", required=True)
+    q.add_argument("file")
+    q.add_argument("--apply", action="store_true", help="make the changes (switches change only after a deploy)")
+    q.set_defaults(run=cmd_intent_import)
     return p
 
 

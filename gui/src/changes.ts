@@ -23,7 +23,8 @@ export function isIntentWrite(method: string, path: string): boolean {
     || /^\/devices\/[^/]+\/port-settings\//.test(p) || /^\/fabrics\/[^/]+\/port-settings\/enabled$/.test(p)
     || /^\/devices\/[^/]+\/protection\//.test(p) || /^\/fabrics\/[^/]+\/protection\/mode$/.test(p)
     || /^\/dci\//.test(p)
-    || /^\/fabrics\/[^/]+\/intent-snapshots\/\d+\/rollback$/.test(p);
+    || /^\/fabrics\/[^/]+\/intent-snapshots\/\d+\/rollback$/.test(p)
+    || /^\/fabrics\/[^/]+\/intent\/import$/.test(p);
 }
 
 export type Step = "saved" | "review" | "approve" | "deploy";
@@ -101,6 +102,7 @@ const WORDS: Record<string, string> = {
   "fabric.gateway-mac": "Gateway MAC changed", "fabric.add-switches": "Switches added",
   "fabric.add-spine": "Spine added", "fabric.add-leaf-pair": "Leaf pair added", "fabric.remove-device": "Switch removed",
   "fabric.rollback": "Rolled back to a rollback point", "fabric.rollback-stopped": "Rollback stopped",
+  "fabric.intent-import": "Imported an intent file", "fabric.intent-import-stopped": "Intent file import stopped",
   "microseg.mode": "Microsegmentation mode changed", "microseg.group": "Security group changed",
   "microseg.inside": "Security group inside rule changed", "microseg.contract": "Contract changed",
   "qos.enabled": "QoS turned on or off", "qos.mark": "QoS mark changed",

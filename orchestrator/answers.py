@@ -204,3 +204,26 @@ class DriftDevice(Answer):
 class Drift(Answer):
     scheduler: DriftScheduler | None
     devices: list[DriftDevice]
+
+
+class Operation(Stored):
+    kind: str                         # what it changes (rollback.py's operations)
+    text: str                         # in plain words
+
+
+class Failed(Answer):
+    text: str
+    error: str
+
+
+class IntentPlan(Answer):
+    fabric: str
+    operations: list[Operation]
+    notes: list[str]
+    ignored: list[str]                # parts of the file an import leaves as they are (set from the GUI)
+
+
+class IntentImported(IntentPlan):
+    done: list[str]
+    failed: Failed | None             # the operation the orchestrator refused; what came before stays done
+    remaining: list[str]

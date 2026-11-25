@@ -16,7 +16,8 @@ TYPED = {
     ("get", "/services"), ("post", "/diff-jobs"), ("get", "/diff-jobs"), ("get", "/diff-jobs/{job_id}"),
     ("get", "/devices/{name}/diff"), ("get", "/drift"), ("post", "/deploy-jobs"), ("get", "/deploy-jobs"),
     ("get", "/deploy-jobs/{job_id}"), ("post", "/deploy-jobs/{job_id}/approve"),
-    ("post", "/deploy-jobs/{job_id}/cancel"),
+    ("post", "/deploy-jobs/{job_id}/cancel"), ("post", "/fabrics/{site}/intent/preview"),
+    ("post", "/fabrics/{site}/intent/import"),
 }
 
 

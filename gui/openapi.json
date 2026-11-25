@@ -6692,6 +6692,190 @@
         }
       }
     },
+    "/fabrics/{site}/intent": {
+      "get": {
+        "summary": "Export Intent",
+        "description": "The fabric's intent as YAML (orchestrator/intent_file.py), to keep in git.",
+        "operationId": "export_intent_fabrics__site__intent_get",
+        "parameters": [
+          {
+            "name": "site",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Site"
+            }
+          },
+          {
+            "name": "fabric_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Fabric Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/yaml": {}
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/fabrics/{site}/intent/preview": {
+      "post": {
+        "summary": "Preview Intent",
+        "description": "What importing the file would change in intent, in order; nothing is written.",
+        "operationId": "preview_intent_fabrics__site__intent_preview_post",
+        "parameters": [
+          {
+            "name": "site",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Site"
+            }
+          },
+          {
+            "name": "fabric_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Fabric Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IntentText"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IntentPlan"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/fabrics/{site}/intent/import": {
+      "post": {
+        "summary": "Import Intent",
+        "description": "Bring intent to the file's: the operations the preview showed, each through the\norchestrator's own checks, stopping at the first refusal. Switches change only through the\nusual review, approval and deploy.",
+        "operationId": "import_intent_fabrics__site__intent_import_post",
+        "parameters": [
+          {
+            "name": "site",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Site"
+            }
+          },
+          {
+            "name": "fabric_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Fabric Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IntentImport"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IntentImported"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/devices/{name}/trunks": {
       "get": {
         "summary": "List Trunks",
@@ -14930,6 +15114,25 @@
         ],
         "title": "Fabric"
       },
+      "Failed": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "error": {
+            "type": "string",
+            "title": "Error"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "text",
+          "error"
+        ],
+        "title": "Failed"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -15076,6 +15279,140 @@
           "addresses"
         ],
         "title": "ImportStart"
+      },
+      "IntentImport": {
+        "properties": {
+          "yaml": {
+            "type": "string",
+            "title": "Yaml"
+          },
+          "expected": {
+            "type": "integer",
+            "title": "Expected"
+          }
+        },
+        "type": "object",
+        "required": [
+          "yaml",
+          "expected"
+        ],
+        "title": "IntentImport"
+      },
+      "IntentImported": {
+        "properties": {
+          "fabric": {
+            "type": "string",
+            "title": "Fabric"
+          },
+          "operations": {
+            "items": {
+              "$ref": "#/components/schemas/Operation"
+            },
+            "type": "array",
+            "title": "Operations"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          },
+          "ignored": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Ignored"
+          },
+          "done": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Done"
+          },
+          "failed": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Failed"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "remaining": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Remaining"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "fabric",
+          "operations",
+          "notes",
+          "ignored",
+          "done",
+          "failed",
+          "remaining"
+        ],
+        "title": "IntentImported"
+      },
+      "IntentPlan": {
+        "properties": {
+          "fabric": {
+            "type": "string",
+            "title": "Fabric"
+          },
+          "operations": {
+            "items": {
+              "$ref": "#/components/schemas/Operation"
+            },
+            "type": "array",
+            "title": "Operations"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          },
+          "ignored": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Ignored"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "fabric",
+          "operations",
+          "notes",
+          "ignored"
+        ],
+        "title": "IntentPlan"
+      },
+      "IntentText": {
+        "properties": {
+          "yaml": {
+            "type": "string",
+            "title": "Yaml"
+          }
+        },
+        "type": "object",
+        "required": [
+          "yaml"
+        ],
+        "title": "IntentText"
       },
       "InventorySwitch": {
         "properties": {
@@ -15880,6 +16217,25 @@
           "servers"
         ],
         "title": "NtpSettings"
+      },
+      "Operation": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "kind",
+          "text"
+        ],
+        "title": "Operation"
       },
       "OspfAuthRoll": {
         "properties": {
