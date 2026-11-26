@@ -66,8 +66,12 @@ export function Services({
   const peer = (targets.data ?? [])
     .find((t) => t.devices.length === 2 && t.devices.some((d) => d.name === form.device))
     ?.devices.find((d) => d.name !== form.device)?.name;
-  // Only an M-LAG trunk makes the service the pair's; a single trunk is like a physical port.
-  const onTrunk = !!ports.find((p) => p.name === form.port)?.mlag;
+  // The service is one switch's (its own ports and single trunks) or, chosen as both switches of an
+  // M-LAG pair, the pair's on one of their M-LAG trunks.
+  const pairs = (targets.data ?? []).filter((t) => t.devices.length === 2 && t.devices.every((d) => leaves.some((l) => l.name === d.name)))
+    .map((t) => t.devices.map((d) => d.name).sort());
+  const [both, setBoth] = useState(false);
+  const onTrunk = both && !!form.port;
 
   useEffect(() => {
     setPorts([]);
@@ -101,6 +105,7 @@ export function Services({
       await createService(site, { ...form, vlan: Number(vlan), asn: form.kind === "isp" ? null : parsed.asn, addresses, ipv6 });
       onDone(`${form.kind === "isp" ? "ISP" : "Firewall"} service ${form.name} created.`);
       setForm(EMPTY);
+      setBoth(false);
       setVlan("");
       setAsn("");
       setOwn("");
@@ -251,24 +256,43 @@ export function Services({
         </label>
         <label>
           Switch
-          <select value={form.device} onChange={set("device")}>
+          <select value={both ? `both:${form.device}` : form.device}
+            onChange={(e) => {
+              const v = e.target.value;
+              setBoth(v.startsWith("both:"));
+              setForm({ ...form, device: v.replace(/^both:/, ""), port: "", vrf: null });
+            }}>
             <option value="">choose…</option>
             {leaves.map((d) => (
               <option key={d.name} value={d.name}>
-                {d.name}
+                {d.name}{pairs.some((p) => p.includes(d.name)) ? " alone" : ""}
               </option>
             ))}
+            {pairs.length > 0 && (
+              <optgroup label="Both switches of an M-LAG pair (an M-LAG port)">
+                {pairs.map(([a, b]) => <option key={a} value={`both:${a}`}>{a} + {b}</option>)}
+              </optgroup>
+            )}
           </select>
         </label>
         {form.device && (
           <div className="attach-plate">
-            <span className="muted small">Click the service's port on {form.device} (a trunk member picks its trunk):</span>
+            <span className="muted small">
+              {both ? `Click one of the pair's M-LAG ports (shown on ${form.device}; ${peer ?? "its peer"} gets the same):`
+                : `Click the service's port on ${form.device} (a trunk member picks its trunk):`}
+            </span>
             <Faceplate
               device={form.device}
               refresh={ports.length}
               pick={{
                 selected: form.port ? [form.port] : [],
-                refuse: (p) => refusal(p, new Set(ports.map((x) => x.name)), trunkOrPort, "carries segments or is not usable for a service"),
+                refuse: (p) => {
+                  const mlag = ports.find((x) => x.name === trunkOrPort(p))?.mlag;
+                  if (both && mlag === false) return "not an M-LAG port: choose this switch alone for it";
+                  if (!both && mlag) return `an M-LAG port: choose both switches (${form.device} + ${peer ?? "its peer"}) for it`;
+                  return refusal(p, new Set(ports.filter((x) => !!x.mlag === both).map((x) => x.name)), trunkOrPort,
+                    "carries segments or is not usable for a service");
+                },
                 target: trunkOrPort,
                 onToggle: (t) => setForm({ ...form, port: form.port === t ? "" : t }),
               }}
