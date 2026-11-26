@@ -11821,6 +11821,209 @@
         }
       }
     },
+    "/routing/{site}/targets/{target}": {
+      "put": {
+        "summary": "Save Target Routing",
+        "description": "Replace a target's routing intent and change the fabric's library (fabric-wide prefix\nlists and route-policies, any target may use them) in one write.",
+        "operationId": "save_target_routing_routing__site__targets__target__put",
+        "parameters": [
+          {
+            "name": "site",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Site"
+            }
+          },
+          {
+            "name": "target",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Target"
+            }
+          },
+          {
+            "name": "fabric_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Fabric Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TargetSave"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Save Target Routing Routing  Site  Targets  Target  Put"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/routing/{site}/library/promote": {
+      "post": {
+        "summary": "Promote Routing Library",
+        "description": "Move the lists and policies every target has identically, and uses, into the fabric's\nlibrary; nothing changes on a switch. `apply` false: preview.",
+        "operationId": "promote_routing_library_routing__site__library_promote_post",
+        "parameters": [
+          {
+            "name": "site",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Site"
+            }
+          },
+          {
+            "name": "apply",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Apply"
+            }
+          },
+          {
+            "name": "fabric_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Fabric Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Promote Routing Library Routing  Site  Library Promote Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/routing/{site}/library": {
+      "get": {
+        "summary": "Routing Library",
+        "description": "The fabric's library and, for each object, the targets whose routing uses it.",
+        "operationId": "routing_library_routing__site__library_get",
+        "parameters": [
+          {
+            "name": "site",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Site"
+            }
+          },
+          {
+            "name": "fabric_session",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Fabric Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Routing Library Routing  Site  Library Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/routing/{site}/imports": {
       "get": {
         "summary": "Routing Imports",
@@ -15483,6 +15686,48 @@
         ],
         "title": "JobId"
       },
+      "LibraryChange": {
+        "properties": {
+          "prefix_lists": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "items": {
+                    "$ref": "#/components/schemas/PrefixRule"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "object",
+            "title": "Prefix Lists"
+          },
+          "route_policies": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "items": {
+                    "$ref": "#/components/schemas/PolicyNode"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "object",
+            "title": "Route Policies"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "LibraryChange",
+        "description": "Library objects to set (or delete: null), by name."
+      },
       "LogLine": {
         "properties": {
           "at": {
@@ -17371,6 +17616,29 @@
           "enabled"
         ],
         "title": "SyslogSettings"
+      },
+      "TargetSave": {
+        "properties": {
+          "routing": {
+            "$ref": "#/components/schemas/DeviceRouting"
+          },
+          "library": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LibraryChange"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "routing"
+        ],
+        "title": "TargetSave"
       },
       "UserChange": {
         "properties": {

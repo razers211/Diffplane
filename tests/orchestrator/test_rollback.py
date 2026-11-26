@@ -90,9 +90,21 @@ def test_routing_objects_in_vpn_instances_leave_first_and_come_back_last():
                  routing={"devices": {"leaf1+leaf2": {"static_routes": [vpn_route, global_route]}}})
     then = intent(services=[FW], routing={"devices": {"leaf1+leaf2": {"static_routes": [global_route]}}})
     result = plan(now, then, Scope(peers=PEERS))
-    assert kinds(result)[0] == ("routing_set", "leaf1+leaf2") and kinds(result)[-1] == ("routing_set", "leaf1+leaf2")
+    assert kinds(result)[0] == ("routing_set", "leaf1+leaf2") and kinds(result)[-1] == ("routing_all", None)
     assert result["operations"][0]["routing"] == {"static_routes": [global_route]}
+    assert result["operations"][-1]["devices"] == {"leaf1+leaf2": {"static_routes": [global_route]}}
     assert ("delete_segment", 10500) in kinds(result)
+
+
+def test_fabric_lists_come_back_with_a_fabric_rollback_and_a_switch_gets_what_it_ran():
+    own = [{"index": 10, "action": "permit", "prefix": "198.51.100.0/24"}]
+    peer = {"address": "192.0.2.1", "asn": 65100, "export_prefix_list": "OWN"}
+    then = intent(routing={"devices": {"leaf1+leaf2": {"bgp_peers": [peer]}}, "library": {"prefix_lists": {"OWN": own}}})
+    now = intent(routing={})
+    fabric = plan(now, then, Scope(peers=PEERS))["operations"]
+    assert [o["kind"] for o in fabric] == ["routing_all"] and fabric[0]["library"] == {"prefix_lists": {"OWN": own}}
+    switch = plan(now, then, Scope(devices={"leaf1", "leaf2"}, target="leaf1+leaf2", peers=PEERS))["operations"]
+    assert switch[-1]["routing"] == {"prefix_lists": {"OWN": own}, "bgp_peers": [peer]}
 
 
 def test_a_replaced_service_frees_its_segments_first():
@@ -227,7 +239,7 @@ def test_a_rollback_never_reaches_the_management_plane():
     refuses `_management_vpn_`, and MEth is never a segment port or trunk member."""
     from orchestrator.routing_intent import DeviceRouting
 
-    intent_ops = {"routing_set", "detach", "set_vid", "attach", "route", "unroute", "delete_service", "service_asn",
+    intent_ops = {"routing_set", "routing_all", "detach", "set_vid", "attach", "route", "unroute", "delete_service", "service_asn",
                   "create_service", "delete_segment", "rename", "create_segment", "delete_trunk", "create_trunk",
                   "ntp", "snmp", "gateway_mac"}
     vpn_route = {"vpn": "web-500", "prefix": "10.9.0.0/16", "next_hop": "NULL0"}

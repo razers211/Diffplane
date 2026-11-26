@@ -9,7 +9,7 @@ from orchestrator import routing_import, routing_intent
 from orchestrator.auth import Accounts
 from orchestrator.netbox import NetBoxClient, NetBoxError
 from orchestrator.deps import (
-    current_user, get_accounts, get_importer, get_netbox, get_routing_store, INTENT_WRITE, LOGIN,
+    APPROVE, current_user, get_accounts, get_importer, get_netbox, get_routing_store, INTENT_WRITE, LOGIN,
     _segment_call,
 )
 
@@ -71,6 +71,58 @@ async def set_device_routing(
     document = await _segment_call(store.set_device(site, device, routing), accounts, user, "routing.set",
                                    f"{site} {device}")
     return document.model_dump(mode="json", exclude_defaults=True)
+
+
+@router.put("/routing/{site}/targets/{target}", dependencies=INTENT_WRITE)
+async def save_target_routing(
+    site: str, target: str, body: routing_intent.TargetSave,
+    user: str = Depends(current_user), store: routing_intent.RoutingStore = Depends(get_routing_store),
+    accounts: Accounts = Depends(get_accounts),
+) -> dict:
+    """Replace a target's routing intent and change the fabric's library (fabric-wide prefix
+    lists and route-policies, any target may use them) in one write."""
+    shared = body.library.model_dump(mode="json", exclude_defaults=True) if body.library else {}
+    detail = f"{site} {target}" + "".join(f"; fabric-wide {kind.replace('_', ' ')[:-1]} {n} {'deleted' if v is None else 'set'}"
+                                          for kind, named in shared.items() for n, v in named.items())
+    document = await _segment_call(store.set_device(site, target, body.routing, body.library), accounts, user,
+                                   "routing.set", detail)
+    return document.model_dump(mode="json", exclude_defaults=True)
+
+
+@router.post("/routing/{site}/library/promote", dependencies=[*INTENT_WRITE, APPROVE])
+async def promote_routing_library(site: str, apply: bool = False, user: str = Depends(current_user),
+                                  store: routing_intent.RoutingStore = Depends(get_routing_store),
+                                  accounts: Accounts = Depends(get_accounts)) -> dict:
+    """Move the lists and policies every target has identically, and uses, into the fabric's
+    library; nothing changes on a switch. `apply` false: preview."""
+    async def run():
+        document, moved, kept = routing_intent.promoted(await store.load(site))
+        if apply and moved:
+            await store.save(site, document)
+        return {"moved": moved, "kept": kept, "applied": apply and bool(moved)}
+
+    if not apply:
+        try:
+            return await run()
+        except segs.SegmentError as exc:
+            raise HTTPException(status_code=404, detail=str(exc))
+        except NetBoxError as exc:
+            raise HTTPException(status_code=503, detail=str(exc))
+    result = await _segment_call(run(), accounts, user, "routing.library", f"{site}: moved into the fabric library")
+    return result
+
+
+@router.get("/routing/{site}/library", dependencies=[LOGIN])
+async def routing_library(site: str, store: routing_intent.RoutingStore = Depends(get_routing_store)) -> dict:
+    """The fabric's library and, for each object, the targets whose routing uses it."""
+    try:
+        document = await store.load(site)
+    except segs.SegmentError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except NetBoxError as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+    return {**document.library.model_dump(mode="json", include=set(routing_intent.SHARED)),
+            "used_by": routing_intent.used_by(document)}
 
 
 @router.get("/routing/{site}/imports", dependencies=[LOGIN])

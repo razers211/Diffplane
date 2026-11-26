@@ -301,9 +301,22 @@ def plan(current: dict, snapshot: dict, scope: Scope) -> dict:
                 if {**default, **here.get(port, {})} != values:
                     ops.append(op("port", f"{device} {port}: settings as at the rollback point",
                                   device=device, port=port, values=values))
-    for target in targets:
-        ops.append(op("routing_set", f"routing of {target}: as at the rollback point", target=target,
-                      routing=snap_routing.get(target) or {}))
+    snap_library = (snapshot.get("routing") or {}).get("library") or {}
+    if scope.fabric:
+        # Targets and the fabric library at once: a list may move between them.
+        if targets or ((current.get("routing") or {}).get("library") or {}) != snap_library:
+            ops.append(op("routing_all", "routing of every switch and the fabric's lists and policies as at the "
+                          "rollback point", devices=snap_routing, library=snap_library))
+    else:
+        from orchestrator.routing_intent import DeviceRouting, effective
+
+        for target in targets:
+            # What the target ran then, the library's objects included: those still the same in
+            # the library are left there; a fabric-wide one changed since is put back only by a fabric rollback.
+            ran = effective(DeviceRouting.model_validate(snap_routing.get(target) or {}),
+                            DeviceRouting.model_validate(snap_library))
+            ops.append(op("routing_set", f"routing of {target}: as at the rollback point", target=target,
+                          routing=ran.model_dump(mode="json", exclude_defaults=True)))
     if scope.fabric:
         cur_fab, snap_fab = current.get("fabric") or {}, snapshot.get("fabric") or {}
         if (cur_fab.get("ntp_servers"), cur_fab.get("ntp_vpn_instance")) != (snap_fab.get("ntp_servers"), snap_fab.get("ntp_vpn_instance")):
@@ -422,6 +435,8 @@ async def execute(nb, fabric: str, planned: dict) -> dict:
         kind = o["kind"]
         if kind == "routing_set":
             await routing_store.set_device(fabric, o["target"], DeviceRouting.model_validate(o["routing"]))
+        elif kind == "routing_all":
+            await routing_store.set_all(fabric, o["devices"], o["library"])
         elif kind == "detach":
             await segments.detach(fabric, o["device"], o["interface"], o["vni"])
         elif kind == "set_vid":

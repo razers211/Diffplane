@@ -52,11 +52,13 @@ Optional per segment: IPv6 (a /64 from the fabric's IPv6 pool, SLAAC or DHCPv6),
 
 A **service** connects routed segments to something outside the fabric:
 
-- a **firewall service**: a dedicated port (or an M-LAG trunk of a pair) to a firewall, a VLAN, a
+- a **firewall service**: a port (or an M-LAG trunk of a pair) to a firewall, a VLAN, a
   Vlanif in the service's own VPN instance, eBGP to the firewall, and per segment two inter-VPN
   static routes (the segment's subnet towards the firewall's instance, a default route back);
 - an **ISP service**: the same container (port, VLAN, Vlanif, VPN instance) with no automatic
   routing; its session to the ISP is defined in routing intent, with import and export policies.
+
+A service port carries no segments, but it may carry several services, each in its own VLAN.
 
 ## Routing intent
 
@@ -65,6 +67,12 @@ routes and OSPF processes are kept as one validated JSON document per fabric. On
 intent is defined once and generated identically on both switches; each switch of the pair may
 also have routing of its own, on it alone (for example each ISP link's BGP session on its own
 border switch). An object in both must be identical.
+
+Prefix lists and route-policies are **fabric-wide**: defined once, any switch or pair may use
+them, and an edit reaches every switch that uses one. A switch gets a list or policy only while
+its routing uses it; once nothing there uses it, the next deploy removes it from that switch.
+Existing per-switch lists that are identical everywhere they are used can be moved into the
+fabric's library in one step (`POST /routing/<site>/library/promote`, preview first).
 
 Ownership differs from the rest of the configuration: Diffplane owns only the routing objects in
 intent (and the ones deleted from intent until a verified deploy removed them). Routing objects

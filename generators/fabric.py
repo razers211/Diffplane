@@ -731,10 +731,29 @@ def _routing_of(device: Any, part: str) -> dict:
     return _merged([docs.get(key) or {}, *([docs.get(device.name) or {}] if key != device.name else [])])
 
 
+def _with_library(routing: dict, library: dict) -> dict:
+    """The fabric library's prefix lists and route-policies this routing uses (defined
+    once, written only where used; mirrors orchestrator.routing_intent.effective)."""
+    peers, own = routing.get("bgp_peers") or [], routing.get("route_policies") or {}
+    shared_policies, shared_lists = library.get("route_policies") or {}, library.get("prefix_lists") or {}
+    policies = {p.get(k) for p in peers for k in ("import_policy", "export_policy")}
+    policies |= {a.get("suppress_policy") for a in routing.get("aggregates") or []}
+    policies = {p for p in policies if p in shared_policies and p not in own}
+    lists = {p.get(k) for p in peers for k in ("import_prefix_list", "export_prefix_list")}
+    lists |= {n.get("match_ip_prefix") for nodes in [*own.values(), *(shared_policies[p] for p in policies)]
+              for n in nodes}
+    lists = {n for n in lists if n in shared_lists and n not in (routing.get("prefix_lists") or {})}
+    if not (lists or policies):
+        return routing
+    return {**routing, "prefix_lists": {**(routing.get("prefix_lists") or {}), **{n: shared_lists[n] for n in lists}},
+            "route_policies": {**own, **{p: shared_policies[p] for p in policies}}}
+
+
 def device_routing(device: Any) -> dict:
     """This device's routing intent: prefix_lists, as_path_filters, community_filters,
-    route_policies, static_routes, bgp_peers, aggregates, ospf (absent keys are empty)."""
-    return _routing_of(device, "devices")
+    route_policies, static_routes, bgp_peers, aggregates, ospf (absent keys are empty), with the
+    library objects it uses."""
+    return _with_library(_routing_of(device, "devices"), routing_document(device).get("library") or {})
 
 
 def retired_routing(device: Any) -> dict:

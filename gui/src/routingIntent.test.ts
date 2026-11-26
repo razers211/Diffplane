@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   count,
+  isShared,
+  splitLibrary,
+  withLibrary,
   keyOf,
   kindsSummary,
   names,
@@ -81,5 +84,29 @@ describe("list summaries", () => {
     const tb = "AnnetError: annet show failed: Traceback\n  File \"x.py\", line 3, in main\nConnectionRefusedError: [Errno 111] Connection refused";
     expect(shortError(tb)).toBe("ConnectionRefusedError: [Errno 111] Connection refused");
     expect(shortError("plain")).toBe("plain");
+  });
+});
+
+describe("the fabric library", () => {
+  const OWN = [{ index: 10, action: "permit" as const, prefix: "198.51.100.0/24" }];
+  const library = { prefix_lists: { OWN } };
+
+  it("shows library objects next to the target's own and saves new ones fabric-wide", () => {
+    const own = { prefix_lists: { MINE: OWN }, bgp_peers: [{ address: "192.0.2.1", asn: 65100 }] };
+    const view = withLibrary(own, library);
+    expect(Object.keys(view.prefix_lists!).sort()).toEqual(["MINE", "OWN"]);
+    const next = { ...view, prefix_lists: { ...view.prefix_lists, NEW: OWN },
+                   route_policies: { "PEER-192.0.2.1-OUT": [{ node: 10, action: "deny" as const }] } };
+    const { routing, library: change } = splitLibrary(next, own, library);
+    expect(Object.keys(routing.prefix_lists!)).toEqual(["MINE"]);
+    expect(Object.keys(routing.route_policies!)).toEqual(["PEER-192.0.2.1-OUT"]);   // a connection's choice stays here
+    expect(change).toEqual({ prefix_lists: { NEW: OWN } });                         // OWN unchanged: not sent
+  });
+
+  it("sends a deleted library object as null", () => {
+    const view = withLibrary({}, library);
+    const { library: change } = splitLibrary({ ...view, prefix_lists: {} }, {}, library);
+    expect(change).toEqual({ prefix_lists: { OWN: null } });
+    expect(isShared("prefix_lists", "OWN", {}, library)).toBe(true);
   });
 });

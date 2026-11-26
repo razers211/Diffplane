@@ -7,7 +7,9 @@ One document per fabric, in the NetBox config context "routing-<site>" under the
 
 A target is a device, or an M-LAG pair "<leaf>+<leaf>" (names sorted): a pair's objects are
 generated identically on both leaves; a paired leaf has no intent of its
-own. VRP defines filters and policies per device, so each target carries its own. `retired` holds
+own. VRP defines filters and policies per device, so each target carries its own; besides them
+the fabric's `library` holds prefix lists and route-policies any target may use: one
+definition, written on a switch only while something there uses it. `retired` holds
 objects deleted from intent (or derived for a deleted service): generators keep owning them
 so the next deploy removes them, and a verified deploy of the device clears them. Hand-made
 routing config on a switch is never removed: it is imported into intent.
@@ -390,6 +392,135 @@ def combined(*routings: DeviceRouting) -> DeviceRouting:
     return DeviceRouting.model_validate(data)
 
 
+# -- the fabric's library ----------------------------------------------------------------------
+# Prefix lists and route-policies defined once for the fabric. A switch gets one only while its
+# routing uses it (a peer, an aggregate or one of its policies names it, or a library policy it
+# uses does); the target's own objects keep their names to themselves (never one in both).
+SHARED = ("prefix_lists", "route_policies")
+
+
+def uses(routing: DeviceRouting) -> tuple[set[str], set[str]]:
+    """(prefix lists, route-policies) a target's objects name."""
+    policies = {p for peer in routing.bgp_peers for p in (peer.import_policy, peer.export_policy) if p}
+    policies |= {a.suppress_policy for a in routing.aggregates if a.suppress_policy}
+    lists = {p for peer in routing.bgp_peers for p in (peer.import_prefix_list, peer.export_prefix_list) if p}
+    lists |= {n.match_ip_prefix for nodes in routing.route_policies.values() for n in nodes if n.match_ip_prefix}
+    return lists, policies
+
+
+def effective(routing: DeviceRouting, library: DeviceRouting) -> DeviceRouting:
+    """What a target runs: its own objects and the library objects they use."""
+    lists, policies = uses(routing)
+    policies = {p for p in policies if p in library.route_policies and p not in routing.route_policies}
+    lists |= {n.match_ip_prefix for p in policies for n in library.route_policies[p] if n.match_ip_prefix}
+    lists = {n for n in lists if n in library.prefix_lists and n not in routing.prefix_lists}
+    if not (lists or policies):
+        return routing
+    return routing.model_copy(update={
+        "prefix_lists": {**routing.prefix_lists, **{n: library.prefix_lists[n] for n in sorted(lists)}},
+        "route_policies": {**routing.route_policies, **{n: library.route_policies[n] for n in sorted(policies)}}})
+
+
+def without_shared(routing: DeviceRouting, library: DeviceRouting) -> DeviceRouting:
+    """A target's routing without its identical copies of library objects (a rollback or an intent
+    file gives a target what it ran: the library's objects included)."""
+    update = {kind: {n: v for n, v in getattr(routing, kind).items() if getattr(library, kind).get(n) != v}
+              for kind in SHARED}
+    return routing.model_copy(update=update)
+
+
+def check_document(devices: dict[str, DeviceRouting], library: DeviceRouting) -> None:
+    """The library holds only lists and policies, its policies use its own lists, no target has a
+    library name of its own, and every target's references resolve (with the library)."""
+    if extra := [k for k in type(library).model_fields if k not in SHARED and getattr(library, k)]:
+        raise ValueError(f"the fabric library holds prefix lists and route-policies only (not {', '.join(extra)})")
+    for name, nodes in library.route_policies.items():
+        for node in nodes:
+            if node.match_ip_prefix and node.match_ip_prefix not in library.prefix_lists:
+                raise ValueError(f"fabric-wide route-policy {name} node {node.node}: no fabric-wide prefix list "
+                                 f"{node.match_ip_prefix}")
+    for target, routing in devices.items():
+        for kind in SHARED:
+            if both := sorted(set(getattr(routing, kind)) & set(getattr(library, kind))):
+                what = "prefix list" if kind == "prefix_lists" else "route-policy"
+                raise ValueError(f"{target}: {what} {', '.join(both)} is fabric-wide; {target} cannot have its own")
+        try:
+            effective(routing, library).check_references()
+        except ValueError as exc:
+            raise ValueError(f"{target}: {exc}") from exc
+
+
+class LibraryChange(Strict):
+    """Library objects to set (or delete: null), by name."""
+    prefix_lists: dict[str, list[PrefixRule] | None] = Field(default_factory=dict)
+    route_policies: dict[str, list[PolicyNode] | None] = Field(default_factory=dict)
+
+    def applied(self, library: DeviceRouting) -> DeviceRouting:
+        data = library.model_dump(mode="json", exclude_defaults=True)
+        for kind in SHARED:
+            named = dict(data.get(kind) or {})
+            for name, value in getattr(self, kind).items():
+                if value is None:
+                    named.pop(name, None)
+                else:
+                    named[name] = [v.model_dump(mode="json") for v in value]
+            data[kind] = named
+        return DeviceRouting.model_validate(data)
+
+
+class TargetSave(Strict):
+    routing: DeviceRouting
+    library: LibraryChange | None = None
+
+
+def used_by(document: "RoutingDocument") -> dict[str, dict[str, list[str]]]:
+    """Library object -> the targets whose routing uses it."""
+    found: dict[str, dict[str, list[str]]] = {kind: {} for kind in SHARED}
+    for target in sorted(document.devices):
+        routing = document.effective(target)
+        for kind in SHARED:
+            for name in getattr(document.library, kind):
+                if name in getattr(routing, kind):
+                    found[kind].setdefault(name, []).append(target)
+    return found
+
+
+def promoted(document: "RoutingDocument") -> tuple["RoutingDocument", list[str], list[str]]:
+    """The one-time move into the library: a list or policy that every target
+    having it has identically, and uses there (so every switch keeps writing it), goes to the
+    library; the simple view's per-connection policies (*-IN, *-OUT) stay. Returns the document,
+    what moved and what stayed (with why). Nothing changes on a switch."""
+    devices = document.devices
+    moved: dict[str, dict] = {kind: {} for kind in SHARED}
+    kept: list[str] = []
+    for kind in SHARED:
+        what = "prefix list" if kind == "prefix_lists" else "route-policy"
+        for name in sorted({n for r in devices.values() for n in getattr(r, kind)}):
+            holders = {t: r for t, r in devices.items() if name in getattr(r, kind)}
+            values = [getattr(r, kind)[name] for r in holders.values()]
+            if kind == "route_policies" and re.search(r"-(IN|OUT)$", name):
+                continue
+            if any(v != values[0] for v in values):
+                kept.append(f"{what} {name}: differs between {', '.join(sorted(holders))}")
+                continue
+            if kind == "prefix_lists":
+                used = all(name in uses(r)[0] for r in holders.values())
+            else:
+                used = all(name in uses(r)[1] for r in holders.values()) and all(
+                    n.match_ip_prefix is None or n.match_ip_prefix in moved["prefix_lists"] for n in values[0])
+            if not used:
+                kept.append(f"{what} {name}: not used everywhere it is (it would leave those switches)")
+                continue
+            moved[kind][name] = values[0]
+    if not any(moved.values()):
+        return document, [], kept
+    library = document.library.model_copy(update={k: {**getattr(document.library, k), **moved[k]} for k in SHARED})
+    devices = {t: r.model_copy(update={k: {n: v for n, v in getattr(r, k).items() if n not in moved[k]} for k in SHARED})
+               for t, r in devices.items()}
+    names = [f"{'prefix list' if k == 'prefix_lists' else 'route-policy'} {n}" for k in SHARED for n in moved[k]]
+    return document.with_routing(devices, library), names, kept
+
+
 def vpns_on(device: str, services: list[dict], segments: list[dict], gateways: set[str] | None = None,
             borders: set[str] = frozenset(), ipv6: bool = False) -> set[str]:
     """VPN instances the platform creates on a device, from the orchestrator's view of the
@@ -444,6 +575,7 @@ def retire(old: DeviceRouting, new: DeviceRouting, retired: DeviceRouting) -> De
 
 class RoutingDocument(Strict):
     devices: dict[str, DeviceRouting] = Field(default_factory=dict)
+    library: DeviceRouting = Field(default_factory=DeviceRouting)   # fabric-wide lists and policies
     retired: dict[str, DeviceRouting] = Field(default_factory=dict)
     # Firewall/ISP services deleted from NetBox, per device that hosted them: FirewallServices
     # keeps owning their inter-VPN routes until a verified deploy has removed them.
@@ -457,27 +589,35 @@ class RoutingDocument(Strict):
 
     @model_validator(mode="after")
     def references(self):
-        for name, routing in self.devices.items():
-            try:
-                routing.check_references()
-            except ValueError as exc:
-                raise ValueError(f"{name}: {exc}") from exc
+        check_document(self.devices, self.library)
         return self
 
     def device(self, name: str) -> DeviceRouting:
         return self.devices.get(name, DeviceRouting())
 
+    def effective(self, name: str) -> DeviceRouting:
+        """What a target runs: its own objects and the library's it uses."""
+        return effective(self.device(name), self.library)
+
     def with_device(self, name: str, routing: DeviceRouting) -> "RoutingDocument":
-        routing.check_references()
-        old = self.device(name)
-        retired = retire(old, routing, self.retired.get(name, DeviceRouting()))
-        devices = {**self.devices, name: routing}
-        retired_all = {**self.retired, name: retired}
-        done = dict(self.retired_done)
-        if retired != self.retired.get(name, DeviceRouting()):
-            done.pop(name, None)   # something newly retired: every leaf must be verified again
+        return self.with_routing({**self.devices, name: routing}, self.library)
+
+    def with_routing(self, devices: dict[str, DeviceRouting], library: DeviceRouting) -> "RoutingDocument":
+        """New targets and library. What a target ran and no longer runs is retired there: an
+        object it dropped, or a library object nothing of it uses any more."""
+        check_document(devices, library)
+        retired_all, done = dict(self.retired), dict(self.retired_done)
+        for name in set(self.devices) | set(devices):
+            old, new = self.effective(name), effective(devices.get(name, DeviceRouting()), library)
+            if old == new:
+                continue
+            before = self.retired.get(name, DeviceRouting())
+            retired_all[name] = retire(old, new, before)
+            if retired_all[name] != before:
+                done.pop(name, None)   # something newly retired: every leaf must be verified again
         return RoutingDocument.model_construct(
             devices={n: d for n, d in devices.items() if not d.is_empty()},
+            library=library,
             retired={n: d for n, d in retired_all.items() if not d.is_empty()},
             retired_services=self.retired_services,
             retired_done=done,
@@ -486,7 +626,7 @@ class RoutingDocument(Strict):
 
     def with_retired_service(self, device: str, service: str) -> "RoutingDocument":
         names = sorted(set(self.retired_services.get(device, [])) | {service})
-        return RoutingDocument.model_construct(devices=self.devices, retired=self.retired,
+        return RoutingDocument.model_construct(devices=self.devices, library=self.library, retired=self.retired,
                                                retired_services={**self.retired_services, device: names},
                                                retired_done=self.retired_done, retired_trunks=self.retired_trunks)
 
@@ -507,7 +647,7 @@ class RoutingDocument(Strict):
             else:
                 done[target] = sorted(seen)
         return RoutingDocument.model_construct(
-            devices=self.devices, retired=retired,
+            devices=self.devices, library=self.library, retired=retired,
             # The device's own, and those of its target's planned leaves: never deployed, never verified.
             retired_services={n: s for n, s in self.retired_services.items()
                               if n != device and (n not in target.split("+") or n in leaves)},
@@ -628,8 +768,10 @@ class RoutingStore:
             raise SegmentError(f"{target} is not an M-LAG pair (two leaves, names sorted, joined by '+')")
         return names
 
-    async def set_device(self, fabric: str, target: str, routing: DeviceRouting) -> RoutingDocument:
-        """Replace a target's routing intent (a device, or an M-LAG pair '<leaf>+<leaf>')."""
+    async def set_device(self, fabric: str, target: str, routing: DeviceRouting,
+                         library: LibraryChange | None = None) -> RoutingDocument:
+        """Replace a target's routing intent (a device, or an M-LAG pair '<leaf>+<leaf>'), and
+        change the fabric's library with it (one write: a new list and the peer using it)."""
         from orchestrator.segments import SegmentError
 
         devices = await self.check_target(fabric, target)
@@ -637,6 +779,11 @@ class RoutingStore:
             await self._check_service_peers(fabric, device, routing)
         await self._check_vpns(fabric, target, routing)
         current = await self.load(fabric)
+        try:
+            shared = library.applied(current.library) if library is not None else current.library
+        except ValueError as exc:
+            raise SegmentError(f"fabric library: {exc}") from exc
+        routing = without_shared(routing, shared)
         # The pair's routing and each switch's own end up on the same switch: no object in both
         # unless identical (one owner per line).
         if len(devices) == 2:
@@ -649,7 +796,26 @@ class RoutingStore:
                 raise SegmentError(f"{', '.join(clash)} also in the routing of {other}, differently: "
                                    "change or remove it there first")
         try:
-            document = current.with_device(target, routing)
+            document = current.with_routing({**current.devices, target: routing}, shared)
+        except ValueError as exc:
+            raise SegmentError(str(exc)) from exc
+        await self.save(fabric, document)
+        return document
+
+    async def set_all(self, fabric: str, devices: dict, library: dict) -> RoutingDocument:
+        """Every target and the library at once (a fabric rollback, an intent file)."""
+        from orchestrator.segments import SegmentError
+
+        current = await self.load(fabric)
+        try:
+            shared = DeviceRouting.model_validate(library or {})
+            wanted = {t: without_shared(DeviceRouting.model_validate(r), shared) for t, r in (devices or {}).items()}
+            for target, routing in wanted.items():
+                if target not in current.devices or routing != current.device(target):
+                    for device in await self.check_target(fabric, target):
+                        await self._check_service_peers(fabric, device, routing)
+                    await self._check_vpns(fabric, target, routing)
+            document = current.with_routing(wanted, shared)
         except ValueError as exc:
             raise SegmentError(str(exc)) from exc
         await self.save(fabric, document)

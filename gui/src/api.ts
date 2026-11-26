@@ -3,7 +3,7 @@ import { INTENT_SAVED, isIntentWrite } from "./changes";
 import { DRAFT_SAVED, draftHeaders, type ChangeSet } from "./draft";
 import type { FacePort } from "./frontPanel";
 import type { OverviewData } from "./overview";
-import type { DeviceRouting, ImportReport, RoutingDocument, RoutingTarget } from "./routingIntent";
+import type { DeviceRouting, ImportReport, LibraryChange, RoutingDocument, RoutingTarget } from "./routingIntent";
 import type { Contract, GbpService, Microseg, MicrosegMode, SwitchState } from "./microseg";
 import type { QosMark, QosView } from "./qos";
 import type { DciDocument, DciLink, DciSegment, DciSide } from "./dci";
@@ -391,6 +391,10 @@ export const fetchRoutingTargets = (site: string) => get<RoutingTarget[]>("/rout
 export const fetchImports = (site: string) => get<ImportReport[]>("/routing/{site}/imports", { path: { site } });
 export const saveRouting = (site: string, target: string, routing: DeviceRouting) =>
   put<RoutingDocument>("/routing/{site}/devices/{device}", { path: { site, device: target }, body: routing });
+export const saveTarget = (site: string, target: string, routing: DeviceRouting, library: LibraryChange) =>
+  put<RoutingDocument>("/routing/{site}/targets/{target}", { path: { site, target }, body: { routing, library } });
+export const fetchLibraryUse = (site: string) =>
+  get<{ used_by: Record<"prefix_lists" | "route_policies", Record<string, string[]>> }>("/routing/{site}/library", { path: { site } });
 export const importNow = (site: string, device: string) =>
   post<ImportReport>("/routing/{site}/devices/{device}/import", { path: { site, device } });
 

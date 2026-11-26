@@ -348,3 +348,108 @@ def test_renaming_a_routed_segment_renames_its_vpn_instance_in_intent():
                          ("a" * 28, "too long: its VPN instance")):
         with pytest.raises(SegmentError, match=message):
             asyncio.run(segments.rename("example", 10500, bad))
+
+
+# -- the fabric library  ------------------------------------------------------
+
+OWN_LIST = {"OWN": [{"index": 10, "action": "permit", "prefix": "198.51.100.0/24"}]}
+OUT_POLICY = {"OUT": [{"node": 10, "action": "permit", "match_ip_prefix": "OWN"}]}
+
+
+def test_a_library_list_is_used_on_any_switch_and_written_only_where_used():
+    from orchestrator.routing_intent import LibraryChange, used_by
+    from orchestrator.segments import SegmentError
+
+    store = RoutingStore(example_netbox())
+    shared = LibraryChange.model_validate({"prefix_lists": OWN_LIST, "route_policies": OUT_POLICY})
+    pair = DeviceRouting.model_validate({"bgp_peers": [{"address": "192.0.2.1", "asn": 65100, "export_policy": "OUT"}]})
+    asyncio.run(store.set_device("example", "leaf1+leaf2", pair, shared))
+    spine = DeviceRouting.model_validate({"bgp_peers": [{"address": "192.0.2.5", "asn": 65105, "export_prefix_list": "OWN"}]})
+    document = asyncio.run(store.set_device("example", "spine1", spine))
+    assert set(document.library.prefix_lists) == {"OWN"} and document.device("spine1").prefix_lists == {}
+    assert set(document.effective("leaf1+leaf2").route_policies) == {"OUT"}
+    assert set(document.effective("spine1").prefix_lists) == {"OWN"}
+    assert document.effective("spine1").route_policies == {}   # OUT is not used there
+    assert used_by(document) == {"prefix_lists": {"OWN": ["leaf1+leaf2", "spine1"]},
+                                 "route_policies": {"OUT": ["leaf1+leaf2"]}}
+    # One definition: edited once, every switch using it gets it.
+    wider = [{"index": 10, "action": "permit", "prefix": "198.51.100.0/23"}]
+    document = asyncio.run(store.set_device("example", "spine1", spine, LibraryChange(prefix_lists={"OWN": wider})))
+    assert str(document.effective("leaf1+leaf2").prefix_lists["OWN"][0].prefix) == "198.51.100.0/23"
+    # A name is fabric-wide or a target's own, never both; a used one cannot go.
+    with pytest.raises(SegmentError, match="prefix list OWN is fabric-wide"):
+        asyncio.run(store.set_device("example", "spine1", DeviceRouting.model_validate(
+            {**spine.model_dump(mode="json", exclude_defaults=True),
+             "prefix_lists": {"OWN": [{"index": 10, "action": "permit", "prefix": "203.0.113.0/24"}]}})))
+    with pytest.raises(SegmentError, match="prefix list OWN"):
+        asyncio.run(store.set_device("example", "spine1", spine, LibraryChange(prefix_lists={"OWN": None})))
+    # An identical copy (a rollback gives a target what it ran) is the library's.
+    ran = document.effective("spine1")
+    assert asyncio.run(store.set_device("example", "spine1", ran)).device("spine1").prefix_lists == {}
+
+
+def test_a_switch_that_stops_using_a_library_object_retires_it_there_only():
+    from orchestrator.routing_intent import LibraryChange
+
+    store = RoutingStore(example_netbox())
+    peer = {"address": "192.0.2.5", "asn": 65105, "export_prefix_list": "OWN"}
+    asyncio.run(store.set_device("example", "spine1", DeviceRouting.model_validate({"bgp_peers": [peer]}),
+                                 LibraryChange.model_validate({"prefix_lists": OWN_LIST})))
+    asyncio.run(store.set_device("example", "leaf1+leaf2", DeviceRouting.model_validate(
+        {"bgp_peers": [{"address": "192.0.2.1", "asn": 65100, "import_prefix_list": "OWN"}]})))
+    document = asyncio.run(store.set_device("example", "spine1", DeviceRouting.model_validate(
+        {"bgp_peers": [{**peer, "export_prefix_list": None}]})))
+    assert set(document.retired["spine1"].prefix_lists) == {"OWN"}
+    assert "leaf1+leaf2" not in document.retired
+    assert set(document.library.prefix_lists) == {"OWN"}
+
+
+def test_identical_used_lists_and_policies_move_into_the_library():
+    from orchestrator.routing_intent import promoted
+
+    def target(prefix="198.51.100.0/24", used=True, extra=None):
+        return {"prefix_lists": {"OWN": [{"index": 10, "action": "permit", "prefix": prefix}], **(extra or {})},
+                "route_policies": {**OUT_POLICY, "ISP-OUT": [{"node": 10, "action": "deny"}]},
+                "bgp_peers": [{"address": "192.0.2.1", "asn": 65100, "export_policy": "OUT" if used else None,
+                               "import_policy": "ISP-OUT"}]}
+
+    document = load({"routing": {"devices": {"a": target(), "b": target(),
+                                             "c": target(extra={"X": [{"index": 5, "action": "deny", "prefix": "10.0.0.0/8"}]})}}})
+    after, moved, kept = promoted(document)
+    assert moved == ["prefix list OWN", "route-policy OUT"]
+    assert kept == ["prefix list X: not used everywhere it is (it would leave those switches)"]
+    assert set(after.device("a").route_policies) == {"ISP-OUT"}   # the simple view's stays per switch
+    assert set(after.device("c").prefix_lists) == {"X"}
+    assert all(after.effective(t) == document.effective(t) for t in "abc") and after.retired == {}
+    differ = load({"routing": {"devices": {"a": target(), "b": target(prefix="203.0.113.0/24")}}})
+    after, moved, kept = promoted(differ)
+    assert moved == [] and kept[0] == "prefix list OWN: differs between a, b"
+
+
+def test_api_previews_then_moves_shared_objects_into_the_library(monkeypatch):
+    from orchestrator import app as app_module
+
+    async def unfrozen():
+        return None
+
+    nb = example_netbox()
+    store = RoutingStore(nb)
+    for target in ("leaf1+leaf2", "spine1"):
+        asyncio.run(store.set_device("example", target, DeviceRouting.model_validate(
+            {"prefix_lists": OWN_LIST, "bgp_peers": [{"address": "192.0.2.1", "asn": 65100, "export_prefix_list": "OWN"}]})))
+    app.dependency_overrides[get_netbox] = lambda: nb
+    app.dependency_overrides[app_module._intent_unfrozen] = unfrozen
+    app.dependency_overrides[app_module.get_accounts] = lambda: type("A", (), {"sessions": None})()
+    monkeypatch.setattr("orchestrator.deps.audit", lambda *_args, **_kwargs: asyncio.sleep(0))
+    try:
+        client = TestClient(app)
+        preview = client.post("/routing/example/library/promote")
+        assert preview.json() == {"moved": ["prefix list OWN"], "kept": [], "applied": False}, preview.text
+        assert asyncio.run(store.load("example")).library.prefix_lists == {}
+        assert client.post("/routing/example/library/promote?apply=true").json()["applied"] is True
+        assert client.get("/routing/example/library").json()["used_by"]["prefix_lists"] == {"OWN": ["leaf1+leaf2", "spine1"]}
+        saved = client.put("/routing/example/targets/spine1", json={"routing": {}, "library": {}})
+        assert saved.status_code == 200 and saved.json()["retired"]["spine1"]["prefix_lists"]["OWN"]
+    finally:
+        for dep in (get_netbox, app_module._intent_unfrozen, app_module.get_accounts):
+            app.dependency_overrides.pop(dep, None)

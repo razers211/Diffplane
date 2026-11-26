@@ -15,9 +15,12 @@ type Save = (next: DeviceRouting, what: string) => Promise<boolean>;
 const label = (p: BgpPeer) => `${p.address}${p.vpn ? ` in ${p.vpn}` : ""}`;
 const where = (vpn: string | null | undefined) => (vpn ? vpn : "Main routing table");
 
-export function RoutingSimple({ routing, vpns, ispVpns, save, edit, imports, onImport }: {
+/** A fabric-wide list or rule set: the other switches using it (null: this switch's own). */
+export type Elsewhere = (kind: "prefix_lists" | "route_policies", name: string) => string[] | null;
+
+export function RoutingSimple({ routing, vpns, ispVpns, save, edit, imports, onImport, elsewhere = () => null }: {
   routing: DeviceRouting; vpns: string[]; ispVpns: string[]; save: Save; edit: boolean;
-  imports: ImportReport[]; onImport: () => void;
+  imports: ImportReport[]; onImport: () => void; elsewhere?: Elsewhere;
 }) {
   const peers = routing.bgp_peers ?? [];
   const isp = (p: BgpPeer) => !!p.vpn && ispVpns.includes(p.vpn);
@@ -46,7 +49,7 @@ export function RoutingSimple({ routing, vpns, ispVpns, save, edit, imports, onI
       <details className="panel fold">
         <summary><h2>Network lists <Tip word="prefix lists" /></h2><span className="faint small">{lists.length} · named groups of networks</span></summary>
         <div className="simple-list">
-          {lists.map((n) => <NetworkList key={n} routing={routing} name={n} save={save} edit={edit} />)}
+          {lists.map((n) => <NetworkList key={n} routing={routing} name={n} save={save} edit={edit} others={elsewhere("prefix_lists", n)} />)}
           {edit && <NewName what="network list" routing={routing} save={save} network />}
         </div>
       </details>
@@ -54,7 +57,7 @@ export function RoutingSimple({ routing, vpns, ispVpns, save, edit, imports, onI
       <details className="panel fold">
         <summary><h2>Rule sets <Tip word="route-policies" /></h2><span className="faint small">{sets.length} · step-by-step rules to accept, drop or prefer routes</span></summary>
         <div className="simple-list">
-          {sets.map((n) => <RuleSet key={n} routing={routing} name={n} lists={lists} save={save} edit={edit} />)}
+          {sets.map((n) => <RuleSet key={n} routing={routing} name={n} lists={lists} save={save} edit={edit} others={elsewhere("route_policies", n)} />)}
           {edit && <NewName what="rule set" routing={routing} save={save} />}
         </div>
       </details>
@@ -213,7 +216,14 @@ function NewConnection({ routing, vpns, ispVpns, save }: { routing: DeviceRoutin
   );
 }
 
-function NetworkList({ routing, name, save, edit }: { routing: DeviceRouting; name: string; save: Save; edit: boolean }) {
+/** "used by …", and for a fabric-wide one where else: a change there changes every switch using it. */
+function useLine(used: string[], others: string[] | null) {
+  const here = used.length ? `used by ${used.join(", ")}` : "not used here";
+  if (!others) return used.length ? here : "not used yet";
+  return `${here} · fabric-wide${others.length ? `, also used on ${others.join(", ")}: a change here changes them too` : ""}`;
+}
+
+function NetworkList({ routing, name, save, edit, others }: { routing: DeviceRouting; name: string; save: Save; edit: boolean; others: string[] | null }) {
   const [net, setNet] = useState("");
   const [inside, setInside] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -226,8 +236,8 @@ function NetworkList({ routing, name, save, edit }: { routing: DeviceRouting; na
     if (await save(next, `${name}: ${net.trim()} added`)) setNet("");
   };
   return (
-    <Card title={name} sub={used.length ? `used by ${used.join(", ")}` : "not used yet"}
-          action={edit && !used.length && <button className="small linkish" onClick={() => save(deleteName(routing, "prefix_lists", name), `Network list ${name} removed`)}>Delete list</button>}>
+    <Card title={name} sub={useLine(used, others)}
+          action={edit && !used.length && !others?.length && <button className="small linkish" onClick={() => save(deleteName(routing, "prefix_lists", name), `Network list ${name} removed`)}>Delete list</button>}>
       <div className="nets">
         {rules.map((r) => (
           <span key={r.index} className="net mono">{networkWords(r)}{r.ge != null && ` (from /${r.ge})`}
@@ -247,15 +257,15 @@ function NetworkList({ routing, name, save, edit }: { routing: DeviceRouting; na
   );
 }
 
-function RuleSet({ routing, name, lists, save, edit }: { routing: DeviceRouting; name: string; lists: string[]; save: Save; edit: boolean }) {
+function RuleSet({ routing, name, lists, save, edit, others }: { routing: DeviceRouting; name: string; lists: string[]; save: Save; edit: boolean; others: string[] | null }) {
   const steps = [...(routing.route_policies?.[name] ?? [])].sort((a, b) => a.node - b.node);
   const used = usedBy(routing, name, label);
   const write = (next: PolicyNode[], what: string) => save(setSteps(routing, name, next), `${name}: ${what}`);
   const change = (i: number, patch: Partial<PolicyNode>, what: string) => write(steps.map((s, k) => (k === i ? { ...s, ...patch } : s)), what);
   const move = (i: number, j: number) => { const next = [...steps]; [next[i], next[j]] = [next[j], next[i]]; write(next, "steps reordered"); };
   return (
-    <Card title={name} sub={used.length ? `used by ${used.join(", ")}` : "not used yet"}
-          action={edit && !used.length && <button className="small linkish" onClick={() => save(deleteName(routing, "route_policies", name), `Rule set ${name} removed`)}>Delete</button>}>
+    <Card title={name} sub={useLine(used, others)}
+          action={edit && !used.length && !others?.length && <button className="small linkish" onClick={() => save(deleteName(routing, "route_policies", name), `Rule set ${name} removed`)}>Delete</button>}>
       <ol className="rsteps">
         {steps.map((s, i) => (
           <li key={s.node}>

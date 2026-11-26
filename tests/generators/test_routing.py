@@ -339,3 +339,36 @@ def test_moving_a_peer_to_the_other_switch_removes_it_from_the_first():
     assert "undo peer 192.0.2.5" in lines, lines
     assert not any("192.0.2.1" in line for line in lines)   # the pair's peer stays
     assert "undo ip ip-prefix OWN index 10" not in " ".join(lines)   # still the pair's
+
+
+def library_routing(used: bool):
+    """A fabric-wide list used by leaf1's own peer, then no longer."""
+    async def prepare(nb):
+        from orchestrator.routing_intent import DeviceRouting, LibraryChange, RoutingStore
+
+        await example_routing(nb)
+        store = RoutingStore(nb)
+        shared = LibraryChange.model_validate({
+            "prefix_lists": {"OWN": [{"index": 10, "action": "permit", "prefix": "198.51.100.0/24"}],
+                             "SPARE": [{"index": 10, "action": "permit", "prefix": "203.0.113.0/24"}]}})
+        peer = {"address": "192.0.2.5", "asn": 65200, "export_prefix_list": "OWN"}
+        await store.set_device("example", "leaf1", DeviceRouting.model_validate({"bgp_peers": [peer]}), shared)
+        if not used:
+            await store.set_device("example", "leaf1", DeviceRouting.model_validate(
+                {"bgp_peers": [{**peer, "export_prefix_list": None}]}))
+    return prepare
+
+
+@cache
+def library(used: bool):
+    return {d.hostname: d for d in devices_from_fabric(EXAMPLE, prepare=library_routing(used))}
+
+
+def test_a_library_list_is_written_only_on_the_switch_that_uses_it():
+    config = render(library(True)["leaf1"])
+    assert "ip ip-prefix OWN index 10 permit 198.51.100.0 24" in config
+    assert "SPARE" not in config   # used nowhere: on no switch
+    assert "ip-prefix OWN" not in render(library(True)["leaf2"])
+    assert patch_to(config, library(True)["leaf1"]) == ""
+    lines = [line.strip() for line in patch_to(config, library(False)["leaf1"]).splitlines()]
+    assert "undo ip ip-prefix OWN index 10" in " ".join(lines), lines

@@ -2900,6 +2900,68 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/routing/{site}/targets/{target}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Save Target Routing
+         * @description Replace a target's routing intent and change the fabric's library (fabric-wide prefix
+         *     lists and route-policies, any target may use them) in one write.
+         */
+        put: operations["save_target_routing_routing__site__targets__target__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/routing/{site}/library/promote": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Promote Routing Library
+         * @description Move the lists and policies every target has identically, and uses, into the fabric's
+         *     library; nothing changes on a switch. `apply` false: preview.
+         */
+        post: operations["promote_routing_library_routing__site__library_promote_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/routing/{site}/library": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Routing Library
+         * @description The fabric's library and, for each object, the targets whose routing uses it.
+         */
+        get: operations["routing_library_routing__site__library_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/routing/{site}/imports": {
         parameters: {
             query?: never;
@@ -3972,6 +4034,20 @@ export interface components {
             /** Id */
             id: number;
         };
+        /**
+         * LibraryChange
+         * @description Library objects to set (or delete: null), by name.
+         */
+        LibraryChange: {
+            /** Prefix Lists */
+            prefix_lists?: {
+                [key: string]: components["schemas"]["PrefixRule"][] | null;
+            };
+            /** Route Policies */
+            route_policies?: {
+                [key: string]: components["schemas"]["PolicyNode"][] | null;
+            };
+        };
         /** LogLine */
         LogLine: {
             /** At */
@@ -4665,6 +4741,11 @@ export interface components {
             host?: string | null;
             /** Port */
             port?: number | null;
+        };
+        /** TargetSave */
+        TargetSave: {
+            routing: components["schemas"]["DeviceRouting"];
+            library?: components["schemas"]["LibraryChange"] | null;
         };
         /** UserChange */
         UserChange: {
@@ -11529,6 +11610,118 @@ export interface operations {
                 "application/json": components["schemas"]["DeviceRouting"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_target_routing_routing__site__targets__target__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                site: string;
+                target: string;
+            };
+            cookie?: {
+                fabric_session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TargetSave"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    promote_routing_library_routing__site__library_promote_post: {
+        parameters: {
+            query?: {
+                apply?: boolean;
+            };
+            header?: never;
+            path: {
+                site: string;
+            };
+            cookie?: {
+                fabric_session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    routing_library_routing__site__library_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                site: string;
+            };
+            cookie?: {
+                fabric_session?: string | null;
+            };
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {

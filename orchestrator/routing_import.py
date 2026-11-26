@@ -26,7 +26,7 @@ from pydantic import ValidationError
 
 from generators.fabric import is_segment_vpn
 from orchestrator import documents
-from orchestrator.routing_intent import DeviceRouting, combined, status_of
+from orchestrator.routing_intent import SHARED, DeviceRouting, combined, status_of
 
 MANAGEMENT_VPN = "_management_vpn_"
 
@@ -465,6 +465,15 @@ def common(results: list[DeviceRouting], known: set = frozenset()) -> tuple[Devi
     return DeviceRouting.model_construct(**named, **keyed), differs
 
 
+def without_library(found: DeviceRouting, library: DeviceRouting) -> tuple[DeviceRouting, list[str]]:
+    """`found` without the library's names; those that differ from the library's are reported."""
+    differs = [f"{'ip-prefix' if kind == 'prefix_lists' else 'route-policy'} {name} (differs from the fabric-wide one)"
+               for kind in SHARED for name, value in getattr(found, kind).items()
+               if name in getattr(library, kind) and getattr(library, kind)[name] != value]
+    update = {kind: {n: v for n, v in getattr(found, kind).items() if n not in getattr(library, kind)} for kind in SHARED}
+    return found.model_copy(update=update), differs
+
+
 def describe(routing: DeviceRouting) -> list[str]:
     """Identities of the objects, for the audit trail and the report."""
     items = [f"ip-prefix {n}" for n in routing.prefix_lists]
@@ -573,9 +582,13 @@ class RoutingImporter:
                 # never adopted into the pair's.
                 own = [document.device(d) for d in texts] + [document.retired.get(d, DeviceRouting()) for d in texts]
                 found_routing, differs = common([r.routing for r in results], known=set().union(*map(identities, own)))
+                # A fabric-wide list or policy is never adopted per switch: the same one is the
+                # library's, another one by its name is left alone.
+                found_routing, shared = without_library(found_routing, document.library)
                 new = new_objects(found_routing, combined(intent, *own[:len(texts)]),
                                   combined(document.retired.get(target, DeviceRouting()), *own[len(texts):]))
-                new, dropped = drop_dangling(new, intent)
+                new, dropped = drop_dangling(new, combined(intent, document.library))
+                dropped = shared + dropped
                 if not new.is_empty():
                     await self.store.set_device(fabric, target, merged(intent, new))
             report.unmanaged = sorted({u for r in results for u in r.unmanaged}) + differs + dropped

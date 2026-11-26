@@ -104,7 +104,7 @@ def test_a_routed_fabric_round_trips_and_a_removal_is_planned_in_order():
     assert [o["text"] for o in planned["operations"]] == [
         "detach web from leaf1 10GE1/0/3", "segment web: no firewall for now (its service is replaced)",
         "delete service FW", "segment web: not routed (frees 10.100.0.1/24)", "delete segment web (VNI 10500)",
-        "routing of leaf1+leaf2: as in the file"]
+        "routing of every switch and the fabric's lists and policies as in the file"]
     result = run(intent_file.apply(nb, "example", yaml.safe_dump(data), expected=6))
     assert result["failed"] is None
     assert run(intent_file.preview(nb, "example", yaml.safe_dump(data)))["operations"] == []

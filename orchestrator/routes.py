@@ -439,8 +439,8 @@ async def intent_of(store, name: str) -> tuple[str | None, DeviceRouting]:
         return None, DeviceRouting()
     document = await store.load(fabric)
     if target == name:
-        return target, document.device(name)
-    return target, combined(document.device(target), document.device(name))
+        return target, document.effective(name)
+    return target, combined(document.effective(target), document.effective(name))
 
 
 async def routing_table(reader: RouteReader, name: str) -> dict:

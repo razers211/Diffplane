@@ -1,6 +1,6 @@
 import { currentDraft } from "./draft";
 import { useState, type FormEvent, type ReactNode } from "react";
-import { fetchImports, fetchRoutingDocument, fetchRoutingTargets, fetchServices, importNow, saveRouting } from "./api";
+import { fetchImports, fetchLibraryUse, fetchRoutingDocument, fetchRoutingTargets, fetchServices, importNow, saveTarget } from "./api";
 import { RouteFlow } from "./RouteFlow";
 import { RoutingSimple } from "./RoutingSimple";
 import {
@@ -15,7 +15,11 @@ import {
   removeItem,
   removeRule,
   shortError,
+  splitLibrary,
+  isShared,
+  withLibrary,
   targetLabel,
+  type Shared,
   type Action,
   type DeviceRouting,
   type ImportReport,
@@ -244,6 +248,7 @@ export function RoutingTargetPage({ site, target }: { site: string; target: stri
   const doc = useFetch(() => (site ? fetchRoutingDocument(site) : Promise.resolve(NO_DOCUMENT)), [site]);
   const targets = useFetch(() => (site ? fetchRoutingTargets(site) : Promise.resolve(NO_TARGETS)), [site]);
   const imports = useFetch(() => (site ? fetchImports(site) : Promise.resolve(NO_IMPORTS)), [site]);
+  const libraryUse = useFetch(() => (site ? fetchLibraryUse(site) : Promise.resolve(null)), [site]);
   const services = useFetch(() => (site ? fetchServices(site) : Promise.resolve([])), [site]);
   const edit = useCan("operator");
   const [notice, setNotice] = useState<string | null>(null);
@@ -252,7 +257,12 @@ export function RoutingTargetPage({ site, target }: { site: string; target: stri
   if (!site) return <NoFabric />;
   const pick = (v: string) => { setView(v); try { localStorage.setItem("routing-view", v); } catch { /* per-viewer only */ } };
 
-  const routing: DeviceRouting = doc.data?.devices?.[target] ?? {};
+  const own: DeviceRouting = doc.data?.devices?.[target] ?? {};
+  const library = doc.data?.library;
+  // Lists and policies are the fabric's (any switch may use them) unless the target has its own.
+  const routing: DeviceRouting = withLibrary(own, library);
+  const elsewhere = (kind: Shared, name: string) =>
+    isShared(kind, name, own, library) ? (libraryUse.data?.used_by[kind]?.[name] ?? []).filter((t) => t !== target).map(targetLabel) : null;
   const retired = doc.data?.retired?.[target];
   const info = targets.data?.find((t) => t.target === target);
   const vpns = info?.vpns ?? [];
@@ -262,9 +272,11 @@ export function RoutingTargetPage({ site, target }: { site: string; target: stri
     setError(null);
     setNotice(null);
     try {
-      await saveRouting(site, target, next);
+      const parts = splitLibrary(next, own, library);
+      await saveTarget(site, target, parts.routing, parts.library);
       setNotice(`${what}. ${currentDraft() ? `It is in draft #${currentDraft()!.id}, applied at its window's start.` : "Prepare a deploy to apply it."}`);
       doc.reload();
+      libraryUse.reload();
       return true;
     } catch (e) {
       setError(message(e));
@@ -304,6 +316,7 @@ export function RoutingTargetPage({ site, target }: { site: string; target: stri
             ? `On ${target} alone, besides the pair's routing (Both switches). The same list or policy may be in both only if identical. `
             : ""}
         VPN instances available here: {vpns.length ? vpns.join(", ") : "none"} (and the global table).
+        Network lists and rule sets are fabric-wide: made here, any switch may use them, and a switch gets one only while something on it uses it.
       </p>
       {doc.error && <p className="error">Could not load routing intent: {doc.error}</p>}
       {retired && count(retired) > 0 && (
@@ -316,7 +329,7 @@ export function RoutingTargetPage({ site, target }: { site: string; target: stri
       {error && <p className="error">{error}</p>}
     </section>
       {doc.data && view === "simple" && (
-        <RoutingSimple routing={routing} vpns={vpns} save={save} edit={edit}
+        <RoutingSimple routing={routing} vpns={vpns} save={save} edit={edit} elsewhere={elsewhere}
                        ispVpns={ispVpns}
                        imports={(imports.data ?? []).filter((r) => info?.devices.some((d) => d.name === r.device))}
                        onImport={async () => {

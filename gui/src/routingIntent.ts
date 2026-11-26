@@ -67,6 +67,7 @@ export interface DeviceRouting {
 
 export interface RoutingDocument {
   devices?: Record<string, DeviceRouting>;
+  library?: DeviceRouting; // fabric-wide prefix lists and route-policies, any target may use them
   retired?: Record<string, DeviceRouting>;
   retired_services?: Record<string, string[]>;
   retired_done?: Record<string, string[]>;
@@ -217,3 +218,46 @@ export function shortError(error: string): string {
   const last = [...lines].reverse().find((l) => /error|exception|failed|refused|timeout|denied|mismatch/i.test(l) && !l.startsWith("File "));
   return (last ?? lines[0] ?? error).slice(0, 200);
 }
+
+// -- the fabric library: prefix lists and route-policies defined once, any switch may use them --
+
+export type Shared = "prefix_lists" | "route_policies";
+export const SHARED: Shared[] = ["prefix_lists", "route_policies"];
+export interface LibraryChange {
+  prefix_lists?: Record<string, PrefixRule[] | null>;
+  route_policies?: Record<string, PolicyNode[] | null>;
+}
+
+/** What a target's page edits: its own objects and every library object (to pick from). */
+export function withLibrary(own: DeviceRouting, library: DeviceRouting | undefined): DeviceRouting {
+  return {
+    ...own,
+    prefix_lists: { ...library?.prefix_lists, ...own.prefix_lists },
+    route_policies: { ...library?.route_policies, ...own.route_policies },
+  };
+}
+
+/** An edited page back into the target's own objects and a library change. A name the target
+ *  has stays its own, as do the simple view's per-connection policies (`*-IN`, `*-OUT`); any
+ *  other list or policy is fabric-wide. Only what changed goes to the library. */
+export function splitLibrary(next: DeviceRouting, own: DeviceRouting, library: DeviceRouting | undefined): { routing: DeviceRouting; library: LibraryChange } {
+  const routing: DeviceRouting = { ...next };
+  const change: LibraryChange = {};
+  for (const kind of SHARED) {
+    const mine: Record<string, unknown> = {};
+    const shared: Record<string, unknown> = {};
+    for (const [name, value] of Object.entries(next[kind] ?? {})) {
+      const local = name in (own[kind] ?? {}) || (kind === "route_policies" && /-(IN|OUT)$/.test(name) && !(name in (library?.[kind] ?? {})));
+      if (local) mine[name] = value;
+      else if (JSON.stringify(library?.[kind]?.[name]) !== JSON.stringify(value)) shared[name] = value;
+    }
+    for (const name of Object.keys(library?.[kind] ?? {})) if (!(name in (next[kind] ?? {}))) shared[name] = null;
+    (routing as Record<string, unknown>)[kind] = mine;
+    if (Object.keys(shared).length) (change as Record<string, unknown>)[kind] = shared;
+  }
+  return { routing, library: change };
+}
+
+/** Whether a list or policy is the fabric's, not this target's own. */
+export const isShared = (kind: Shared, name: string, own: DeviceRouting, library: DeviceRouting | undefined) =>
+  !(name in (own[kind] ?? {})) && name in (library?.[kind] ?? {});

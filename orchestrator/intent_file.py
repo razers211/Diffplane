@@ -27,7 +27,7 @@ KIND = "diffplane-intent"
 VERSION = 1
 MAX_BYTES = 2_000_000
 # Plan operations an intent file may run: each goes through a checked API function.
-IMPORTED = {"routing_set", "detach", "set_vid", "attach", "route", "unroute", "delete_service", "service_asn",
+IMPORTED = {"routing_set", "routing_all", "detach", "set_vid", "attach", "route", "unroute", "delete_service", "service_asn",
             "create_service", "service_ipv6", "delete_segment", "rename", "create_segment", "delete_trunk",
             "create_trunk", "ntp", "snmp", "relay", "ipv6", "netstream", "syslog", "gateway_mac"}
 KEPT = {"ports": "port settings", "dci": "DC links", "overrides": "what the import kept as found"}
@@ -155,7 +155,8 @@ def _merge(current: dict, wanted: dict) -> tuple[dict, list[str]]:
     for key in ("segments", "services", "trunks"):
         merged[key] = wanted.get(key, [] if key != "trunks" else {})
     merged["routing"] = {**(current.get("routing") or {}),
-                         "devices": (wanted.get("routing") or {}).get("devices") or {}}
+                         "devices": (wanted.get("routing") or {}).get("devices") or {},
+                         "library": (wanted.get("routing") or {}).get("library") or {}}
     for key, words in KEPT.items():
         if key in wanted and wanted[key] != current.get(key):
             ignored.append(words)
