@@ -358,7 +358,7 @@ export const deleteService = (site: string, name: string) =>
 export const setRouting = (
   site: string,
   vni: number,
-  body: { routed: boolean; prefix_length?: number; firewall?: string | null; peers?: number[] },
+  body: { routed: boolean; prefix_length?: number; subnet?: string | null; firewall?: string | null; peers?: number[] },
 ) => put<object>("/segments/{site}/{vni}/routing", { path: { site, vni }, body });
 
 export type DriftState = "in_sync" | "out_of_sync" | "error" | "unknown";

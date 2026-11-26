@@ -17087,6 +17087,17 @@
             "type": "array",
             "title": "Peers",
             "default": []
+          },
+          "subnet": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subnet"
           }
         },
         "type": "object",

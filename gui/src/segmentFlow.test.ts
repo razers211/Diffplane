@@ -35,6 +35,10 @@ describe("ports and routing steps", () => {
   it("checks the prefix length only when routed", () => {
     expect(routingErrors({ ...emptyDraft(), prefixLength: "31" })).toBeNull();
     expect(routingErrors({ ...emptyDraft(), routed: true, prefixLength: "31" })).toMatch(/8 to 30/);
+    expect(routingErrors({ ...emptyDraft(), routed: true, subnet: "10.20.30.0/24" })).toBeNull();
+    expect(routingErrors({ ...emptyDraft(), routed: true, subnet: "10.20.30.5/24" })).toMatch(/boundary/);
+    expect(routingErrors({ ...emptyDraft(), routed: true, subnet: "10.20.30.0/31" })).toMatch(/8 to \/30/);
+    expect(routingErrors({ ...emptyDraft(), routed: true, subnet: "10.20.300.0/24" })).toMatch(/IPv4/);
   });
 });
 

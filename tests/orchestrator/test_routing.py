@@ -93,6 +93,28 @@ def test_routed_segment_gets_a_gateway_and_the_default_firewall(nb):
     assert gateway["vrf"] is not None and gateway["description"] == "example:web gateway"
 
 
+def test_a_segment_takes_the_operators_own_network_inside_or_outside_the_pool(nb):
+    s, r = with_segments(nb), Routing(nb)
+    run(r.set_routing("example", 10500, True, firewall=None, subnet="192.168.50.0/26", chosen=True))   # outside the pool
+    assert context(nb)["segments"]["10500"]["routing"]["gateway"] == "192.168.50.1/26"
+    run(r.set_routing("example", 10600, True, firewall=None, subnet="10.100.7.0/24", chosen=True))     # inside it
+    assert context(nb)["segments"]["10600"]["routing"]["gateway"] == "10.100.7.1/24"
+    # the next free one skips what the operator took
+    run(r.segments.create("example", "app", 10700, 700))
+    run(r.set_routing("example", 10700, True, firewall=None))
+    assert context(nb)["segments"]["10700"]["routing"]["gateway"] == "10.100.0.1/24"
+
+
+def test_an_own_network_overlapping_the_fabric_or_malformed_is_refused(nb):
+    s, r = with_segments(nb), Routing(nb)
+    with pytest.raises(SegmentError, match="overlaps"):
+        run(r.set_routing("example", 10500, True, firewall=None, subnet="10.10.0.0/24", chosen=True))   # the loopback pool
+    for bad, why in (("10.20.30.0/31", "/8 to /30"), ("not a net", "not an IPv4"), ("fd00::/64", "IPv4")):
+        with pytest.raises(SegmentError, match=why):
+            run(r.set_routing("example", 10500, True, firewall=None, subnet=bad, chosen=True))
+    assert context(nb)["segments"]["10500"].get("routing") is None
+
+
 def test_routed_without_firewall_and_with_explicit_peers(nb):
     s, r = with_segments(nb), Routing(nb)
     run(r.set_routing("example", 10600, True, firewall=None))

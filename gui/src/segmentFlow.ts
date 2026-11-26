@@ -22,6 +22,7 @@ export interface Draft {
   ports: PortChoice[];
   routed: boolean;
   prefixLength: string;
+  subnet: string;   // the operator's own gateway network ("" = the next free one of the pool)
   firewall: string; // "" = no default route
   peers: number[];
   relay: string;    // DHCP servers in the segment's own VPN instance, comma or space separated; "" = no relay
@@ -29,7 +30,7 @@ export interface Draft {
 }
 
 export const emptyDraft = (): Draft => ({
-  name: "", vni: "", bd: "", ports: [], routed: false, prefixLength: "24", firewall: "", peers: [], relay: "", ipv6: "",
+  name: "", vni: "", bd: "", ports: [], routed: false, prefixLength: "24", subnet: "", firewall: "", peers: [], relay: "", ipv6: "",
 });
 
 /** The DHCP relay servers typed in the wizard. */
@@ -79,9 +80,21 @@ export function portErrors(d: Draft): (string | null)[] {
   });
 }
 
+/** Why a typed gateway network is not usable, or null: an IPv4 network /8-/30 on its boundary. */
+export function subnetError(text: string): string | null {
+  const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})\/(\d{1,2})$/.exec(text.trim());
+  if (!m || m.slice(1, 5).some((o) => Number(o) > 255)) return "Type the network as an IPv4 address and length, e.g. 10.20.30.0/24";
+  const len = Number(m[5]);
+  if (len < 8 || len > 30) return "The gateway network is /8 to /30";
+  const ip = m.slice(1, 5).reduce((a, o) => a * 256 + Number(o), 0);
+  if (ip % 2 ** (32 - len) !== 0) return `${text.trim()} is not on a /${len} boundary`;
+  return null;
+}
+
 /** Problems with the routing step. */
 export function routingErrors(d: Draft): string | null {
   if (!d.routed) return null;
+  if (d.subnet.trim()) return subnetError(d.subnet);
   if (!whole(d.prefixLength) || Number(d.prefixLength) < 8 || Number(d.prefixLength) > 30) return "The gateway prefix length is 8 to 30";
   const servers = relayServers(d);
   const ipv4 = /^(25[0-5]|2[0-4]\d|1?\d?\d)(\.(25[0-5]|2[0-4]\d|1?\d?\d)){3}$/;
@@ -112,7 +125,7 @@ export function plan(d: Draft): Write[] {
   if (d.routed) {
     const route = d.firewall ? `default route via ${d.firewall}` : "no default route";
     const peers = d.peers.length ? `, peered with ${d.peers.length} segment${d.peers.length > 1 ? "s" : ""}` : "";
-    writes.push({ kind: "route", label: `Route it: a /${d.prefixLength} gateway, ${route}${peers}` });
+    writes.push({ kind: "route", label: `Route it: ${d.subnet.trim() ? `gateway network ${d.subnet.trim()}` : `a /${d.prefixLength} gateway`}, ${route}${peers}` });
     if (d.ipv6) writes.push({ kind: "ipv6", label: `IPv6 too: a /64, hosts on ${d.ipv6 === "slaac" ? "SLAAC" : d.ipv6 === "dhcpv6" ? "DHCPv6" : "manual addresses"}` });
     const servers = relayServers(d);
     if (servers.length) writes.push({ kind: "relay", label: `Relay DHCP to ${servers.join(", ")}` });

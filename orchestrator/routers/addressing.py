@@ -18,6 +18,8 @@ class RoutingIntent(BaseModel):
     # A model, not Body() parameters: FastAPI reads an explicit null Body() as "use the default".
     firewall: str | None = "default"
     peers: list[int] = []
+    # The operator's own gateway subnet, instead of the next free one of the pool.
+    subnet: str | None = None
 
 
 @router.put("/segments/{site}/{vni}/routing", dependencies=INTENT_WRITE)
@@ -28,9 +30,10 @@ async def set_routing(
 ) -> dict:
     """Route a segment (gateway subnet from the fabric pool, firewall default route and/or
     peerings) or stop routing it."""
-    detail = (f"{site} vni={vni} routed firewall={intent.firewall} peers={intent.peers}" if intent.routed
-              else f"{site} vni={vni} not routed")
-    call = routing.set_routing(site, vni, intent.routed, intent.prefix_length, intent.firewall, intent.peers)
+    detail = (f"{site} vni={vni} routed firewall={intent.firewall} peers={intent.peers}"
+              + (f" subnet={intent.subnet}" if intent.subnet else "") if intent.routed else f"{site} vni={vni} not routed")
+    call = routing.set_routing(site, vni, intent.routed, intent.prefix_length, intent.firewall, intent.peers,
+                               subnet=intent.subnet, chosen=True)
     return await _segment_call(call, accounts, user, "segment.routing", detail)
 
 

@@ -4583,6 +4583,8 @@ export interface components {
              * @default []
              */
             peers: number[];
+            /** Subnet */
+            subnet?: string | null;
         };
         /** Segment */
         Segment: {

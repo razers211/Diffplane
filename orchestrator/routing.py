@@ -360,13 +360,14 @@ class Routing:
 
     async def set_routing(self, fabric: str, vni: int, routed: bool, prefix_length: int = 24,
                           firewall: str | None = "default", peers: list[int] | None = None,
-                          subnet: str | None = None) -> dict:
+                          subnet: str | None = None, chosen: bool = False) -> dict:
         """Make a segment routed (gateway, firewall, peers) or not routed.
 
         firewall="default" picks the fabric's first service; None means
         no firewall default route. `subnet` (a rollback): the exact gateway subnet to take
         back, instead of the next free one; refused unless it lies in the gateway pool and
-        nothing else in the fabric overlaps it.
+        nothing else in the fabric overlaps it. `chosen`: the subnet is the operator's own,
+        inside the pool or outside it, refused only where the fabric's addresses overlap it.
         """
         site = await self.segments._site(fabric)
         l2vpns = {l["identifier"]: l for l in await self.segments._l2vpns(site)}
@@ -432,7 +433,12 @@ class Routing:
         await self._guard(fabric, f"changing the firewall of segment {display_name(segment)}", new_firewall)
 
         gateway = _ref_id(_cf(segment, "gateway_prefix"))
-        wanted = ipaddress.ip_interface(subnet).network if subnet else None
+        try:
+            wanted = ipaddress.ip_interface(subnet).network if subnet else None
+        except ValueError as exc:
+            raise SegmentError(f"{subnet!r} is not an IPv4 network (e.g. 10.20.30.0/24)") from exc
+        if wanted is not None and (wanted.version != 4 or not 8 <= wanted.prefixlen <= 30):
+            raise SegmentError(f"{wanted}: a gateway subnet is an IPv4 network from /8 to /30")
         if gateway is not None and wanted is not None:
             current = (await self.nb.find("ipam/prefixes", id=gateway))[0]["prefix"]
             if ipaddress.ip_network(current) != wanted:
@@ -455,7 +461,7 @@ class Routing:
             elif wanted is None:
                 child = await self.nb.allocate_prefix(pool["id"], {"prefix_length": prefix_length, **fields})
             else:
-                child = await self._exact_prefix(pool, wanted, fields)
+                child = await self._exact_prefix(pool, wanted, fields, inside_pool=not chosen)
             gateway = child["id"]
 
         # Peering is symmetric: both VPN instances import each other's L3 route target.

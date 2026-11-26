@@ -383,6 +383,7 @@ export function SegmentRouting({
   const canOperate = useCan("operator");
   const [editing, setEditing] = useState(false);
   const [prefixLength, setPrefixLength] = useState("24");
+  const [subnet, setSubnet] = useState("");
   const [firewall, setFirewall] = useState("");
   const [peers, setPeers] = useState<number[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -407,6 +408,7 @@ export function SegmentRouting({
       await setRouting(fabric, segment.vni, {
         routed: true,
         prefix_length: Number(prefixLength),
+        subnet: subnet.trim() || null,
         firewall: firewall || null,
         peers,
       });
@@ -451,10 +453,16 @@ export function SegmentRouting({
       {editing && (
         <form className="form-row" onSubmit={save}>
           {!routing && (
-            <label>
-              Gateway subnet /
-              <input value={prefixLength} onChange={(e) => setPrefixLength(e.target.value)} inputMode="numeric" />
-            </label>
+            <>
+              <label>
+                Gateway subnet /
+                <input value={prefixLength} onChange={(e) => setPrefixLength(e.target.value)} inputMode="numeric" disabled={!!subnet.trim()} />
+              </label>
+              <label>
+                or my own network
+                <input className="mono" value={subnet} onChange={(e) => setSubnet(e.target.value)} placeholder="e.g. 10.20.30.0/24" spellCheck={false} />
+              </label>
+            </>
           )}
           <label>
             Default route

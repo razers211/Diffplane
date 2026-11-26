@@ -37,7 +37,9 @@ unique within its fabric. Ports carry segments **tagged** (a VLAN ID) or **untag
 generates an L2 sub-interface per attachment (`<port>.<bd>` tagged, `<port>.1` untagged). An
 attachment to an M-LAG server trunk is written on both leaves of the pair.
 
-A segment can be **routed**: it gets a gateway subnet from the fabric's gateway pool, an anycast
+A segment can be **routed**: it gets a gateway subnet (the next free one of the fabric's gateway pool,
+or a network the operator names, inside the pool or outside it, as long as nothing in the fabric
+overlaps it), an anycast
 gateway (VBDIF, the subnet's first host, one fabric-wide gateway MAC) and its own VPN instance,
 named `<segment>-<bd>`. Segments reach each other in two ways, combinable:
 

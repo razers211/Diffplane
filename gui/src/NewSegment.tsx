@@ -116,7 +116,7 @@ export function NewSegment({
           await setRelay(site, vni, relayServers(draft).map((address) => ({ address })));
         } else {
           await setRouting(site, vni, {
-            routed: true, prefix_length: Number(draft.prefixLength), firewall: draft.firewall || null, peers: draft.peers,
+            routed: true, prefix_length: Number(draft.prefixLength), subnet: draft.subnet.trim() || null, firewall: draft.firewall || null, peers: draft.peers,
           });
         }
         states[i] = { ...entry, state: "done" };
@@ -212,18 +212,24 @@ export function NewSegment({
                         </div>
                       </div>
                       <div className="wz-group">
-                        <span className="k">Gateway subnet size · from the fabric's gateway pool</span>
+                        <span className="k">Gateway subnet · the next free one of the fabric's gateway pool, or your own</span>
                         <div className="chips">
                           {PREFIX_CHOICES.map((l) => (
-                            <button type="button" key={l} className="chip" aria-pressed={!otherPrefix && draft.prefixLength === l}
-                              onClick={() => { setOtherPrefix(false); set({ prefixLength: l }); }}>/{l} · {2 ** (32 - Number(l)) - 2} hosts</button>
+                            <button type="button" key={l} className="chip" aria-pressed={!otherPrefix && !draft.subnet && draft.prefixLength === l}
+                              onClick={() => { setOtherPrefix(false); set({ prefixLength: l, subnet: "" }); }}>/{l} · {2 ** (32 - Number(l)) - 2} hosts</button>
                           ))}
-                          <button type="button" className="chip" aria-pressed={otherPrefix} onClick={() => setOtherPrefix(true)}>other…</button>
-                          {otherPrefix && (
+                          <button type="button" className="chip" aria-pressed={otherPrefix && !draft.subnet} onClick={() => { setOtherPrefix(true); set({ subnet: "" }); }}>other…</button>
+                          {otherPrefix && !draft.subnet && (
                             <span className="inline">/<input id="seg-prefix" className="narrow" value={draft.prefixLength} inputMode="numeric" autoFocus
                               onChange={(e) => set({ prefixLength: e.target.value })} aria-label="Gateway prefix length" /></span>
                           )}
                         </div>
+                        <label className="inline small">
+                          or my own network
+                          <input id="seg-subnet" className="mono" value={draft.subnet} placeholder="e.g. 10.20.30.0/24" spellCheck={false}
+                            onChange={(e) => set({ subnet: e.target.value })} aria-label="Gateway network" />
+                        </label>
+                        <span className="muted small">Your own network may lie outside the pool; it must not overlap any address the fabric uses. The gateway is its first address.</span>
                         {rError && <span className="field-error">{rError}</span>}
                       </div>
                       <div className="wz-group">
