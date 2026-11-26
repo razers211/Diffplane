@@ -143,9 +143,8 @@ class Routing:
         six = await self._ipv6(fabric, ipv6, devices if len(devices) > 1 else None) if ipv6 else None
         others = await self.services(fabric)
         for other in others:
+            # A port may carry several services,, each in its own VLAN.
             shared = set(devices) & set(other["devices"])
-            if shared and other["port"] == port:
-                raise SegmentError(f"{' and '.join(sorted(shared))} {port} is already used by service {other['name']}")
             if shared and vlan in (other["vlan"], other["rd_vlan"]):
                 raise SegmentError(f"VLAN {vlan} is already used by service {other['name']} on "
                                    f"{' and '.join(sorted(shared))}"

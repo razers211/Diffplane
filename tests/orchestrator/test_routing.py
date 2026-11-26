@@ -74,8 +74,8 @@ def test_service_ports_are_dedicated(nb):
         run(r.create_service("example", "FW2", **{**FW, "port": "10GE1/0/11", "vlan": 3002}))
     with pytest.raises(SegmentError, match="firewall service port"):
         run(s.attach("example", "leaf1", "10GE1/0/10", 10500, 500))
-    with pytest.raises(SegmentError, match="already used by service"):
-        run(r.create_service("example", "FW2", **{**FW, "vlan": 3002}))
+    run(r.create_service("example", "FW2", **{**FW, "vlan": 3002, "address": "10.255.2.1/30", "next_hop": "10.255.2.2"}))
+    # a port may carry several services
     assert "10GE1/0/10" not in [p["name"] for p in run(s.ports("leaf1"))]
 
 
@@ -312,10 +312,9 @@ def test_a_service_trunk_is_dedicated_on_both_leaves(nb):
         with pytest.raises(SegmentError, match="service port"):
             run(s.attach("example", leaf, "Eth-Trunk1", 10500, 500))
         assert "Eth-Trunk1" not in [p["name"] for p in run(s.ports(leaf))]
-    with pytest.raises(SegmentError, match="already used by service FW"):
-        run(r.create_service("example", "FW2", **{**PAIR_FW, "device": "leaf1", "vlan": 3006}))
+    run(r.create_service("example", "FW2", **{**PAIR_FW, "device": "leaf1", "vlan": 3006}))   # another service there
     with pytest.raises(SegmentError, match="VLAN 3005 is already used"):
-        run(r.create_service("example", "FW2", **{**FW, "vlan": 3005}))
+        run(r.create_service("example", "FW3", **{**FW, "vlan": 3005}))
 
 
 def test_a_pair_service_needs_a_free_trunk(nb):
