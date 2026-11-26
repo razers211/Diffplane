@@ -333,7 +333,8 @@ export interface Port {
 
 export const fetchSegments = (site: string) => get<Segment[]>("/segments", { query: { site } });
 export const fetchNextBdId = (site: string) => get<{ bd_id: number }>("/segments/next-bd-id", { query: { site } });
-export const fetchPorts = (device: string) => get<Port[]>("/devices/{name}/ports", { path: { name: device } });
+export const fetchPorts = (device: string, services = false) =>
+  get<Port[]>("/devices/{name}/ports", { path: { name: device }, query: { services } });
 export const createSegment = (site: string, name: string, vni: number, bd_id: number) =>
   post<Segment>("/segments", { body: { site, name, vni, bd_id } });
 export const deleteSegment = (site: string, vni: number) => del<object>("/segments/{site}/{vni}", { path: { site, vni } });

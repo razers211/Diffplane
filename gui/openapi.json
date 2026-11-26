@@ -2983,7 +2983,7 @@
     "/devices/{name}/ports": {
       "get": {
         "summary": "Attachable Ports",
-        "description": "Ports of a leaf that may carry segments (server trunks first).",
+        "description": "Ports of a leaf that may carry segments (server trunks first); `services`: also those\nservices sit on (a new service may join them).",
         "operationId": "attachable_ports_devices__name__ports_get",
         "parameters": [
           {
@@ -2993,6 +2993,16 @@
             "schema": {
               "type": "string",
               "title": "Name"
+            }
+          },
+          {
+            "name": "services",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Services"
             }
           },
           {

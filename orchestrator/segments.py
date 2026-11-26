@@ -412,8 +412,9 @@ class Segments:
             raise SegmentError(reason)
         return device, iface
 
-    async def ports(self, device_name: str) -> list[dict]:
-        """Ports of a leaf that may carry segments, with what they carry now."""
+    async def ports(self, device_name: str, with_services: bool = False) -> list[dict]:
+        """Ports of a leaf that may carry segments, with what they carry now. `with_services`: also
+        the ports services sit on (a port may carry several services)."""
         # Three NetBox requests in all, not three per port: a leaf has 100+ interfaces.
         device = await self._leaf(device_name)
         interfaces, addresses, services, vlan_trunks = await asyncio.gather(
@@ -425,7 +426,8 @@ class Segments:
         service = {port for dev, port in services if dev == device["id"]}
         result = []
         for iface in interfaces:
-            if (self._refusal(device_name, iface, iface["id"] in routed) is not None or iface["name"] in service
+            if (self._refusal(device_name, iface, iface["id"] in routed) is not None
+                    or (iface["name"] in service and not with_services)
                     or iface["name"] in vlan_trunks.get(device_name, ())):
                 continue
             result.append({

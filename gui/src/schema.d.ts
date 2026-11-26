@@ -847,7 +847,8 @@ export interface paths {
         };
         /**
          * Attachable Ports
-         * @description Ports of a leaf that may carry segments (server trunks first).
+         * @description Ports of a leaf that may carry segments (server trunks first); `services`: also those
+         *     services sit on (a new service may join them).
          */
         get: operations["attachable_ports_devices__name__ports_get"];
         put?: never;
@@ -6623,7 +6624,9 @@ export interface operations {
     };
     attachable_ports_devices__name__ports_get: {
         parameters: {
-            query?: never;
+            query?: {
+                services?: boolean;
+            };
             header?: never;
             path: {
                 name: string;

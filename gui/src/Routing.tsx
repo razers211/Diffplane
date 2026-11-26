@@ -72,8 +72,9 @@ export function Services({
   useEffect(() => {
     setPorts([]);
     if (!form.device) return;
-    fetchPorts(form.device)
-      // A service port is dedicated: a physical port, a single trunk, or an M-LAG trunk (the pair's service).
+    fetchPorts(form.device, true)
+      // A service port carries no segments (a physical port, a single trunk, or an M-LAG trunk: the
+      // pair's service); it may carry other services, each in its own VLAN.
       .then((all) => setPorts(all.filter((p) => p.segments.length === 0)))
       .catch((e) => setError(`Could not list ${form.device}'s ports: ${message(e)}`));
   }, [form.device]);

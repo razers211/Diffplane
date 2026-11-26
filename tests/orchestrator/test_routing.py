@@ -75,8 +75,9 @@ def test_service_ports_are_dedicated(nb):
     with pytest.raises(SegmentError, match="firewall service port"):
         run(s.attach("example", "leaf1", "10GE1/0/10", 10500, 500))
     run(r.create_service("example", "FW2", **{**FW, "vlan": 3002, "address": "10.255.2.1/30", "next_hop": "10.255.2.2"}))
-    # a port may carry several services
+    # a port may carry several services: the service form is offered it, segments never
     assert "10GE1/0/10" not in [p["name"] for p in run(s.ports("leaf1"))]
+    assert "10GE1/0/10" in [p["name"] for p in run(s.ports("leaf1", with_services=True))]
 
 
 def test_routed_segment_gets_a_gateway_and_the_default_firewall(nb):

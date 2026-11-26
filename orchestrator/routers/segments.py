@@ -29,10 +29,12 @@ async def list_segments(site: str, segments: segs.Segments = Depends(get_segment
 
 
 @router.get("/devices/{name}/ports", dependencies=[LOGIN])
-async def attachable_ports(name: str, segments: segs.Segments = Depends(get_segments)) -> list[dict]:
-    """Ports of a leaf that may carry segments (server trunks first)."""
+async def attachable_ports(name: str, services: bool = False,
+                           segments: segs.Segments = Depends(get_segments)) -> list[dict]:
+    """Ports of a leaf that may carry segments (server trunks first); `services`: also those
+    services sit on (a new service may join them)."""
     try:
-        return await segments.ports(name)
+        return await segments.ports(name, with_services=services)
     except segs.SegmentError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
 
