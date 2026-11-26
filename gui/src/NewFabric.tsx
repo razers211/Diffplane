@@ -25,7 +25,7 @@ export function NewFabric({ onCreated }: { onCreated: (site: string) => void }) 
   const propose = async () => {
     setPlanError(null);
     try {
-      const p = await proposeAddressPlan(s.supernet.trim());
+      const p = await proposeAddressPlan(s.supernet.trim(), s.vendor);
       setPlan(p);
       setS({ ...s, prefixes: p.prefixes, bypassVlan: String(p.bypass_vlan), gatewayMac: s.gatewayMac || p.gateway_mac });
     } catch (e) {
@@ -57,6 +57,16 @@ export function NewFabric({ onCreated }: { onCreated: (site: string) => void }) 
         <div className="form-row build-form">
           <label>Name<input value={s.name} onChange={(e) => set({ name: e.target.value })} placeholder="dc2" /></label>
           <label>ASN<input className="mono" value={s.asn} onChange={(e) => set({ asn: e.target.value })} inputMode="numeric" placeholder="65002" /></label>
+          <fieldset>
+            <legend>Switch vendor</legend>
+            {(["huawei", "arista"] as const).map((v) => (
+              <label className="check" key={v}>
+                {/* the models offered are the vendor's: a new vendor asks for the plan again */}
+                <input type="radio" checked={s.vendor === v} onChange={() => { set({ vendor: v, prefixes: null }); setPlan(null); }} />
+                {v === "huawei" ? "Huawei CloudEngine (VRP)" : "Arista EOS (not deployable yet: config generation comes next)"}
+              </label>
+            ))}
+          </fieldset>
           <fieldset>
             <legend>Architecture</legend>
             <label className="check">

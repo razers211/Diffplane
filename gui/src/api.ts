@@ -415,6 +415,7 @@ export interface FabricArchitecture {
 }
 export interface FabricSettings {
   asn: number | null;
+  vendor?: "huawei" | "arista";
   pools: Partial<Record<"loopback" | "vtep" | "p2p" | "mlag_bypass" | "gateways" | "pip", string>>;
   bypass_vlan: number | null;
   gateway_mac: string | null;
@@ -625,11 +626,13 @@ export const removeInventory = (serial: string) => del<{ removed: string }>("/in
 
 export type Pools = Record<"loopback" | "vtep" | "p2p" | "mlag_bypass" | "gateways" | "pip", string>;
 export interface AddressPlan { prefixes: Pools; gateway_mac: string; bypass_vlan: number; models: Record<string, string[]> }
-export const proposeAddressPlan = (supernet: string) => post<AddressPlan>("/fabrics/address-plan", { body: { supernet } });
+export const proposeAddressPlan = (supernet: string, vendor = "huawei") =>
+  post<AddressPlan>("/fabrics/address-plan", { body: { supernet, vendor } });
 export interface NewFabricSettings {
   name: string;
   asn: number;
   architecture: "symmetric" | "centralized";
+  vendor: "huawei" | "arista";
   prefixes: Pools;
   bypass_vlan: number;
   gateway_mac: string;

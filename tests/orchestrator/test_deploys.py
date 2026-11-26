@@ -387,6 +387,17 @@ def test_only_allowed_sites(database_url, monkeypatch):
         run(jobs.request("alice", site="example"))
 
 
+def test_deploys_to_arista_switches_are_refused_until_they_are_built(database_url, monkeypatch):
+    nb = FakeNetBox()
+    asyncio.run(seed(nb, parse(yaml.safe_load((ROOT / "tests" / "fixtures" / "example-arista.yaml").read_text())),
+                     active={"eos-leaf1": "172.24.5.11/24"}))
+    monkeypatch.setenv("DEPLOY_ALLOWED_SITES", "eos")
+    jobs, _ = make(database_url, nb=nb)
+
+    with pytest.raises(DeployError, match="Arista switches are not built yet: eos-leaf1"):
+        run(jobs.request("alice", site="eos"))
+
+
 def test_a_fabric_turned_off_after_preparing_cannot_be_approved(database_url, monkeypatch):
     """deploys are allowed per fabric from the Fabric page; approval checks again."""
     monkeypatch.setenv("DEPLOY_ALLOWED_SITES", "example")

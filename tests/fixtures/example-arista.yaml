@@ -1,0 +1,38 @@
+# An Arista fabric for tests: example-small.yaml's shape on vEOS-lab switches.
+fabric:
+  name: eos
+  vendor: arista
+  asn: 65010
+  prefixes:
+    loopback: 10.50.0.0/24
+    vtep: 10.50.1.0/24
+    p2p: 10.51.0.0/24
+    mlag_bypass: 10.52.0.0/24
+    gateways: 10.150.0.0/16
+  mlag:
+    bypass_vlan: 4093
+  gateway_mac: 0000-5e00-0150
+
+services:
+  ntp_servers: []
+  snmp:
+    location: eos-lab
+
+spines:
+  - name: eos-spine1
+    model: vEOS-lab
+
+leaf_pairs:
+  - leaves: [eos-leaf1, eos-leaf2]
+    model: vEOS-lab
+    role: leaf
+    peer_link:
+      trunk: 10
+      members: [Ethernet7, Ethernet8]
+    mlag_trunks:
+      - trunk: 1
+        members: [Ethernet3]
+
+links:
+  - {spine: eos-spine1, spine_port: Ethernet1, leaf: eos-leaf1, leaf_port: Ethernet1}
+  - {spine: eos-spine1, spine_port: Ethernet2, leaf: eos-leaf2, leaf_port: Ethernet1}

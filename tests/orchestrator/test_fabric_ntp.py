@@ -64,7 +64,7 @@ def test_api_sets_ntp(monkeypatch):
         fabric = client.get("/fabrics/example").json()
         assert fabric["ntp"] == {"servers": ["192.0.2.7"], "vpn_instance": "_management_vpn_"}
         assert fabric["settings"] == {   # seed/fabrics/example.yaml, read only on the Fabric page
-            "asn": 65001, "bypass_vlan": 4093, "gateway_mac": "0000-5e00-0101",
+            "asn": 65001, "vendor": "huawei", "bypass_vlan": 4093, "gateway_mac": "0000-5e00-0101",
             "snmp_location": "example-dc", "snmp_contact": "noc@example.com",
             "pools": {"loopback": "10.10.0.0/24", "vtep": "10.10.1.0/24", "p2p": "10.11.0.0/24",
                       "mlag_bypass": "10.12.0.0/24", "gateways": "10.100.0.0/16"}}

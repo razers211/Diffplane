@@ -105,7 +105,7 @@ async def get_settings(nb: NetBoxClient, site: str) -> dict:
             pools[key] = found["prefix"]
     snmp = fabric.get("snmp") or {}
     return {
-        "asn": fabric.get("asn"), "pools": pools, "bypass_vlan": (fabric.get("mlag") or {}).get("bypass_vlan"),
+        "asn": fabric.get("asn"), "vendor": fabric.get("vendor") or "huawei", "pools": pools, "bypass_vlan": (fabric.get("mlag") or {}).get("bypass_vlan"),
         "gateway_mac": fabric.get("gateway_mac"), "snmp_location": snmp.get("location"), "snmp_contact": snmp.get("contact"),
     }
 

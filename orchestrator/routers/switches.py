@@ -161,6 +161,7 @@ def _batch(body: NewSwitches) -> tuple[dict, str]:
 
 class AddressPlanRequest(BaseModel):
     supernet: str
+    vendor: str = "huawei"   # the models offered are this vendor's (a fabric is one vendor)
 
 
 @router.post("/fabrics/address-plan", dependencies=[LOGIN, OPERATE])
@@ -175,13 +176,14 @@ async def fabric_address_plan(body: AddressPlanRequest, netbox: NetBoxClient = D
     except NetBoxError as exc:
         raise HTTPException(status_code=503, detail=str(exc))
     return {"prefixes": prefixes, "gateway_mac": mac, "bypass_vlan": 4093,
-            "models": await _models(netbox)}
+            "models": await _models(netbox, body.vendor)}
 
 
 class NewFabricSettings(BaseModel):
     name: str
     asn: int
     architecture: str = "symmetric"
+    vendor: str = "huawei"   # Annet's names: huawei or arista
     prefixes: dict[str, str]
     bypass_vlan: int = 4093
     gateway_mac: str
@@ -232,10 +234,11 @@ async def inventory_models(netbox: NetBoxClient = Depends(get_netbox)) -> list[s
     return sorted(await _models(netbox))
 
 
-async def _models(netbox: NetBoxClient) -> dict[str, list[str]]:
-    """Every model with a known port layout (learned from switches, or known from the start)."""
+async def _models(netbox: NetBoxClient, vendor: str | None = None) -> dict[str, list[str]]:
+    """Every model with a known port layout (learned from switches, or known from the start);
+    `vendor`: that vendor's only."""
     await seed_ports.refresh(netbox)
-    return {m: seed_ports.ports_of(m) for m in seed_ports.known_models()}
+    return {m: seed_ports.ports_of(m) for m in seed_ports.known_models(vendor)}
 
 
 @router.post("/inventory", status_code=201, dependencies=[LOGIN, OPERATE])

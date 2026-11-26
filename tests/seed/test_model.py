@@ -50,7 +50,7 @@ def test_interface_type(name, expected):
     assert interface_type(name) == expected
 
 
-@pytest.mark.parametrize("name", ["Ethernet1", "100GE1/0", "XGE1/0/1", "Eth-Trunk"])
+@pytest.mark.parametrize("name", ["Ethernet", "100GE1/0", "XGE1/0/1", "Eth-Trunk"])
 def test_interface_type_rejects_unknown(name):
     with pytest.raises(FabricError):
         interface_type(name)

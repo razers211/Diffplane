@@ -3365,6 +3365,11 @@ export interface components {
         AddressPlanRequest: {
             /** Supernet */
             supernet: string;
+            /**
+             * Vendor
+             * @default huawei
+             */
+            vendor: string;
         };
         /** Aggregate */
         Aggregate: {
@@ -4141,6 +4146,11 @@ export interface components {
              * @default symmetric
              */
             architecture: string;
+            /**
+             * Vendor
+             * @default huawei
+             */
+            vendor: string;
             /** Prefixes */
             prefixes: {
                 [key: string]: string;

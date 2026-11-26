@@ -14,6 +14,7 @@ from types import SimpleNamespace
 from typing import Any
 
 from annet import patching
+from seed import ports as seed_ports
 from annet.adapters.netbox.common.manufacturer import get_breed
 from annet.annlib.netdev.views.hardware import HardwareView
 from annet.gen import format_config_blocks
@@ -53,8 +54,9 @@ class StubDevice:
     def __post_init__(self) -> None:
         self.fqdn = self.hostname
         self.id = self.hostname
-        self.hw = HardwareView(f"Huawei {self.model}", "")
-        self.breed = get_breed("Huawei", self.model)
+        maker = seed_ports.manufacturer(self.model)
+        self.hw = HardwareView(f"{maker} {self.model}", "")
+        self.breed = get_breed(maker, self.model)
         self.name = self.hostname
         self.storage = self.storage or _STORAGE
         self.role = SimpleNamespace(slug=self.role_slug)

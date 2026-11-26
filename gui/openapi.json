@@ -13494,6 +13494,11 @@
           "supernet": {
             "type": "string",
             "title": "Supernet"
+          },
+          "vendor": {
+            "type": "string",
+            "title": "Vendor",
+            "default": "huawei"
           }
         },
         "type": "object",
@@ -15982,6 +15987,11 @@
             "type": "string",
             "title": "Architecture",
             "default": "symmetric"
+          },
+          "vendor": {
+            "type": "string",
+            "title": "Vendor",
+            "default": "huawei"
           },
           "prefixes": {
             "additionalProperties": {

@@ -70,6 +70,7 @@ def definition(settings: dict) -> Fabric:
             "name": name,
             "asn": settings.get("asn"),
             "architecture": settings.get("architecture") or "symmetric",
+            "vendor": settings.get("vendor") or "huawei",
             "prefixes": dict(settings.get("prefixes") or {}),
             "mlag": {"bypass_vlan": settings.get("bypass_vlan")},
             "gateway_mac": settings.get("gateway_mac"),

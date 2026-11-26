@@ -94,6 +94,10 @@ and every Huawei golden unchanged:
    seed, the fabric builder and the orchestrator ask it instead of writing VRP names.
 2. **Vendor per fabric.** A fabric setting (`huawei` by default), the switch models offered
    limited to it, a port layout for vEOS-lab; Annet takes a model named `Arista ...` as EOS.
+   *Built:* `fabric.vendor` in the fabric YAML and New fabric (absent means Huawei), the
+   manufacturer of each model's NetBox device type follows it (Annet's breed comes from it), a
+   fabric refuses another vendor's models, vEOS-lab's ports assumed `Ethernet1-8` until read, and
+   deploys and upgrades to Arista switches refused until step 5.
 3. **Arista generators and goldens** for the first-version scope: underlay, EVPN with spines as
    route reflectors, MLAG pairs with a shared VTEP, segments (VLAN-to-VNI) on ports and
    port-channels, anycast gateways in one VRF per routed segment, NTP, SNMP, syslog.

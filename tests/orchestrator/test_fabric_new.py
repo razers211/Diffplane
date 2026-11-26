@@ -31,6 +31,7 @@ def wizard(path: Path, **changes) -> tuple[dict, dict]:
     data = yaml.safe_load(path.read_text())
     f, services = data["fabric"], data["services"]
     settings = {"name": f["name"], "asn": f["asn"], "architecture": f.get("architecture", "symmetric"),
+                "vendor": f.get("vendor", "huawei"),
                 "prefixes": f["prefixes"], "bypass_vlan": f["mlag"]["bypass_vlan"], "gateway_mac": f["gateway_mac"],
                 "ntp_servers": services.get("ntp_servers") or [],
                 "snmp_location": (services.get("snmp") or {}).get("location"),
@@ -83,6 +84,30 @@ def test_a_new_fabric_is_what_the_seed_makes_of_the_same_yaml():
     fabric = context(nb, "gui1")["fabric"]
     assert fabric["asn"] == 65001 and fabric["architecture"] == "symmetric" and fabric["gateway_mac"] == "0000-5e00-0101"
     assert fabric["ntp_servers"] == ["192.0.2.1", "192.0.2.2"] and fabric["mlag"] == {"bypass_vlan": 4093}
+
+
+def test_a_new_arista_fabric_has_arista_switches_and_eos_names():
+    nb = FakeNetBox()
+    settings, batch = wizard(ROOT / "tests" / "fixtures" / "example-arista.yaml")
+    run(create(nb, settings, batch))
+    assert context(nb, "eos")["fabric"]["vendor"] == "arista"
+    makers = {m["id"]: m["name"] for m in nb.objects["dcim/manufacturers"].values()}
+    assert {makers[t["manufacturer"]] for t in nb.objects["dcim/device-types"].values()} == {"Arista"}
+    leaf = devices(nb, "eos")["eos-leaf1"]
+    names = {i["name"] for i in nb.objects["dcim/interfaces"].values() if i["device"] == leaf["id"]}
+    assert {"Loopback0", "Loopback1", "Port-Channel10", "Vlan4093"} <= names and not any("LoopBack" in n for n in names)
+
+
+def test_a_fabric_is_one_vendor_in_new_fabric_and_add_switches():
+    settings, batch = wizard(ROOT / "tests" / "fixtures" / "example-arista.yaml")
+    mixed = {**batch, "spines": [{"name": "eos-spine1", "model": MODEL}]}
+    with pytest.raises(SegmentError, match="not a arista switch"):
+        run(create(FakeNetBox(), settings, mixed))
+    nb = FakeNetBox()
+    run(seed(nb, load(ROOT / "tests" / "fixtures" / "example-small.yaml")))
+    with pytest.raises(SegmentError, match="vEOS-lab is not a huawei switch"):
+        run(FabricBuilder(nb, "example").add({"spines": [{"name": "spine9", "model": "vEOS-lab"}]}))
+    assert run(FabricBuilder(nb, "example").options())["models"].keys() == {MODEL, "CE6881H-48T6CQ", "CE6881H-48T6CQ-K"}
 
 
 def test_a_centralized_fabric_needs_its_gateway_pair():
@@ -190,7 +215,8 @@ def test_api_new_fabric_and_inventory(example):
         plan = client.post("/fabrics/address-plan", json={"supernet": "10.92.0.0/16"}).json()
         assert plan["prefixes"]["gateways"] == "10.92.128.0/17" and plan["gateway_mac"] == "0200-00fa-0001"
         assert MODEL in plan["models"]
-        assert client.get("/inventory/models").json() == [MODEL, "CE6881H-48T6CQ", "CE6881H-48T6CQ-K"]   # imported fabrics
+        assert client.get("/inventory/models").json() == [MODEL, "CE6881H-48T6CQ", "CE6881H-48T6CQ-K", "vEOS-lab"]   # imported fabrics
+        assert MODEL not in client.post("/fabrics/address-plan", json={"supernet": "10.92.0.0/16", "vendor": "arista"}).json()["models"]
         assert client.post("/inventory", json={"serial": "SN1", "model": MODEL, "mac": "aa:bb:cc:00:00:01"}).status_code == 201
         settings = {"name": "dc9", "asn": 65009, "prefixes": plan["prefixes"], "gateway_mac": plan["gateway_mac"]}
         switches = {"spines": [{"name": "dc9-spine1", "model": MODEL, "inventory": "SN1"}],

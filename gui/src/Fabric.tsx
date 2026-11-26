@@ -72,6 +72,7 @@ export function Fabric({ site }: { site: string }) {
                   : <><Term k="symmetric">Symmetric</Term>: each leaf is the gateway of the segments attached to it</>}
               </dd>
               <dt>ASN</dt><dd className="mono">{f.settings.asn ?? "—"}</dd>
+              <dt>Switch vendor</dt><dd>{f.settings.vendor === "arista" ? "Arista EOS" : "Huawei CloudEngine"}</dd>
               <dt><Term k="gateway">Gateway</Term> MAC</dt>
               <dd><Editable value={f.settings.gateway_mac ?? ""} mono can={canOperate}
                 save={(v) => saveGatewayMac(site, v)} done={(v) => changed(`Gateway MAC set to ${v}.`)} /></dd>

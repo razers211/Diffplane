@@ -30,12 +30,14 @@ from datetime import datetime, timedelta
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
+from generators import naming
 from generators.switch_login import NAME
 from orchestrator.annet import AnnetError, AnnetRunner
 from orchestrator.auth import audit
 from orchestrator.db import DeployStep, DiffSnapshot, Job, JobLog, now
 from orchestrator.netbox import NetBoxClient
 from orchestrator.redact import EXTRA, redact
+from seed import ports as seed_ports
 
 log = logging.getLogger(__name__)
 
@@ -291,6 +293,11 @@ class DeployJobs:
             )
         if not names:
             raise DeployError("no active devices in scope")
+        # shortcut: only Huawei generators and deploys exist yet; Arista deploys come with ROADMAP's Arista step 5.
+        other = [n for n in names if seed_ports.vendor_of_model((by_name[n].get("device_type") or {}).get("model"))
+                 != naming.HUAWEI]
+        if other:
+            raise DeployError(f"deploys to Arista switches are not built yet: {', '.join(other)}")
         return names
 
     async def request(self, user: str, site: str | None = None, devices: list[str] | None = None,

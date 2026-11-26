@@ -10,6 +10,8 @@ CONTEXT = {"fabric": {"ntp_servers": ["192.0.2.1"], "snmp": {}, "loopback_prefix
 
 def test_breed_is_vrp85_for_lab_model():
     assert StubDevice("leaf1", "CE6881H-48S6CQ").breed == "vrp85"
+    eos = StubDevice("leaf1", "vEOS-lab")   # Annet takes an Arista model as EOS
+    assert eos.breed == "eos4" and eos.hw.vendor == "arista"
 
 
 def test_missing_fabric_context_fails_instead_of_removing_ntp():

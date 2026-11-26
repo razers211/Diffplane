@@ -82,9 +82,11 @@ class FabricBuilder(Seeder):
                 pools[key] = ipaddress.ip_network(found["prefix"])
                 self.pools.add(key)
         settings = (context.get("data") or {}).get("fabric") or {}
+        vendor = settings.get("vendor") or VENDOR
         self.fabric = SimpleNamespace(
             name=site["name"], slug=self.slug, p2p_prefix=pools.get("p2p"), mlag_bypass_prefix=pools.get("mlag_bypass"),
-            services=SimpleNamespace(mlag_bypass_vlan=(settings.get("mlag") or {}).get("bypass_vlan")),
+            vendor=vendor, services=SimpleNamespace(mlag_bypass_vlan=(settings.get("mlag") or {}).get("bypass_vlan"),
+                                                   vendor=vendor),
         )
         self.context = context
         self.centralized = settings.get("architecture") == "centralized"
@@ -102,11 +104,15 @@ class FabricBuilder(Seeder):
             raise SegmentError(f"device name {name!r} is already used (names are unique across fabrics)")
 
     def _model(self, model: str) -> list[str]:
+        vendor = self.fabric.vendor
         ports = list(self.layouts.get(model) or ports_of(model))
         if not ports:
             raise SegmentError(f"model {model!r} has no known port layout (detect the switch from its management "
                                f"address so its ports are read, or add it by ZTP or import); "
-                               f"known: {', '.join(seed_ports.known_models())}")
+                               f"known: {', '.join(seed_ports.known_models(vendor))}")
+        if seed_ports.vendor_of_model(model) != vendor:
+            raise SegmentError(f"{model} is not a {vendor} switch: a fabric is one vendor "
+                               f"(known: {', '.join(seed_ports.known_models(vendor))})")
         return ports
 
     def _detected(self, name: str, model: str, address: str | None, detected: dict) -> dict | None:
@@ -172,7 +178,7 @@ class FabricBuilder(Seeder):
             devices.append({"name": name, "role": role, "free_ports": sorted(free, key=_port_key),
                             "paired": bool((device.get("custom_fields") or {}).get("mlag_peer")),
                             "model": ((device.get("device_type") or {}).get("model"))})
-        return {"fabric": self.slug, "models": {m: ports_of(m) for m in seed_ports.known_models()},
+        return {"fabric": self.slug, "models": {m: ports_of(m) for m in seed_ports.known_models(self.fabric.vendor)},
                 "devices": devices, "bypass": self.fabric.services.mlag_bypass_vlan is not None,
                 "centralized": self.centralized, "gateway_pair": self.gateway_pair}
 
@@ -267,7 +273,8 @@ class FabricBuilder(Seeder):
                     for member in t.members:
                         self._claim(used, leaf, member, self._model(model))
             built_pairs.append(LeafPair(leaves=(leaves[0], leaves[1]), model=model, role=role,
-                                        peer_link_trunk=trunk, peer_link_members=tuple(members), mlag_trunks=mlag))
+                                        peer_link_trunk=trunk, peer_link_members=tuple(members), mlag_trunks=mlag,
+                                        vendor=self.fabric.vendor))
             if pair.get("gateway"):   # a border-leaf pair as a centralized fabric's gateway pair
                 if not self.centralized:
                     raise SegmentError(f"{self.slug} is symmetric: it has no gateway pair")
@@ -292,8 +299,8 @@ class FabricBuilder(Seeder):
                     self._existing(n, ("spine",), "spine")
                     if (self.devices[n].get("custom_fields") or {}).get("mlag_peer"):
                         raise SegmentError(f"{n} is already in an M-LAG pair")
-                    if await self.nb.find("dcim/interfaces", device_id=self.devices[n]["id"], name=naming.trunk(VENDOR, trunk)):
-                        raise SegmentError(f"{n} already has {naming.trunk(VENDOR, trunk)}: pick another peer-link trunk number")
+                    if await self.nb.find("dcim/interfaces", device_id=self.devices[n]["id"], name=naming.trunk(self.fabric.vendor, trunk)):
+                        raise SegmentError(f"{n} already has {naming.trunk(self.fabric.vendor, trunk)}: pick another peer-link trunk number")
                     for member in members:
                         self._claim(used, n, member)
                         await self._free_port(n, member)
@@ -312,7 +319,8 @@ class FabricBuilder(Seeder):
                     for member in t.members:
                         self._claim(used, n, member, self._model(model))
             built_pairs.append(LeafPair(leaves=(names[0], names[1]), model=model, role="spine",
-                                        peer_link_trunk=trunk, peer_link_members=tuple(members), mlag_trunks=mlag))
+                                        peer_link_trunk=trunk, peer_link_members=tuple(members), mlag_trunks=mlag,
+                                        vendor=self.fabric.vendor))
         if len(gateway_choices) > 1:
             raise SegmentError("only one pair can become the gateway pair")
         new_gateways = gateway_choices[0] if gateway_choices else None
@@ -463,8 +471,7 @@ class FabricBuilder(Seeder):
             await self.nb.delete("dcim/devices", device["id"])
             self.report.add(f"take {n} from the inventory (serial {device.get('serial')})")
 
-    @staticmethod
-    def _mlag_trunks(pair: dict, peer_link: int) -> tuple[MlagTrunk, ...]:
+    def _mlag_trunks(self, pair: dict, peer_link: int) -> tuple[MlagTrunk, ...]:
         """A new pair's M-LAG server trunks (an imported pair, the GUI adds them afterwards)."""
         trunks = []
         for t in pair.get("mlag_trunks") or []:
@@ -472,10 +479,10 @@ class FabricBuilder(Seeder):
             if not isinstance(number, int) or not 1 <= number <= MAX_TRUNK or number == peer_link:
                 raise SegmentError(f"M-LAG trunk number {number!r}: 1-{MAX_TRUNK}, not the peer-link's")
             if not members:
-                raise SegmentError(f"{naming.trunk(VENDOR, number)} needs at least one member")
+                raise SegmentError(f"{naming.trunk(self.fabric.vendor, number)} needs at least one member")
             if number in (x.trunk for x in trunks):
-                raise SegmentError(f"{naming.trunk(VENDOR, number)} is given twice")
-            trunks.append(MlagTrunk(trunk=number, members=members))
+                raise SegmentError(f"{naming.trunk(self.fabric.vendor, number)} is given twice")
+            trunks.append(MlagTrunk(trunk=number, members=members, vendor=self.fabric.vendor))
         return tuple(trunks)
 
     def _peer_link(self, pair: dict) -> tuple[int, list[str]]:
@@ -513,14 +520,14 @@ class FabricBuilder(Seeder):
 
     async def _own_vtep(self, leaf: str) -> None:
         """A lone leaf's own VTEP address on LoopBack1, from the VTEP pool."""
-        iface = await self._interface(leaf, naming.loopback(VENDOR, 1))
+        iface = await self._interface(leaf, naming.loopback(self.fabric.vendor, 1))
         if await self.nb.find("ipam/ip-addresses", interface_id=iface["id"], role="anycast"):
             return
         ip = await self.nb.allocate_ip(self._ids["prefix:vtep"],
                                        {"assigned_object_type": "dcim.interface", "assigned_object_id": iface["id"],
                                         "status": "active", "role": "anycast"})
         await self._host_mask(ip, None)
-        self.report.add(f"allocate ipam/ip-addresses {ip['address']} for {leaf} {naming.loopback(VENDOR, 1)} (VTEP)")
+        self.report.add(f"allocate ipam/ip-addresses {ip['address']} for {leaf} {naming.loopback(self.fabric.vendor, 1)} (VTEP)")
 
     # -- removal ---------------------------------------------------------------------------
 
@@ -613,7 +620,7 @@ class FabricBuilder(Seeder):
         Its cables and the bypass /30 went with the removed spine."""
         device = await self.nb.find_one("dcim/devices", name=name)
         interfaces = await self.nb.find("dcim/interfaces", device_id=device["id"])
-        bypass = naming.svi(VENDOR, self.fabric.services.mlag_bypass_vlan)
+        bypass = naming.svi(self.fabric.vendor, self.fabric.services.mlag_bypass_vlan)
         for iface in interfaces:
             tags = {t.get("slug") for t in iface.get("tags") or [] if isinstance(t, dict)}
             if "peer-link" in tags:
@@ -622,7 +629,7 @@ class FabricBuilder(Seeder):
                     if (lag.get("id") if isinstance(lag, dict) else lag) == iface["id"]:
                         await self.nb.update("dcim/interfaces", member["id"], {"lag": None})
                 await self.nb.delete("dcim/interfaces", iface["id"])
-            elif iface["name"] in (naming.loopback(VENDOR, 1), naming.loopback(VENDOR, 2), bypass):
+            elif iface["name"] in (naming.loopback(self.fabric.vendor, 1), naming.loopback(self.fabric.vendor, 2), bypass):
                 for ip in await self.nb.find("ipam/ip-addresses", interface_id=iface["id"]):
                     await self.nb.delete("ipam/ip-addresses", ip["id"])
                 await self.nb.delete("dcim/interfaces", iface["id"])

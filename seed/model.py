@@ -24,8 +24,8 @@ LEAF_ROLES = ("leaf", "border-leaf")
 # gateway pair (M-LAG) holding every gateway while the other leaves stay layer 2.
 ARCHITECTURES = ("symmetric", "centralized")
 
-# shortcut: every fabric is Huawei until a fabric names its vendor (ROADMAP, Arista step 2).
-VENDOR = naming.HUAWEI
+# A fabric is one vendor (fabric.vendor in the YAML, Huawei by default); names follow it.
+VENDOR = naming.HUAWEI   # the default
 
 
 class FabricError(ValueError):
@@ -42,6 +42,8 @@ def interface_type(name: str) -> str:
     match = _PORT_RE.fullmatch(name)
     if match and match.group(1) in _PORT_TYPES:
         return _PORT_TYPES[match.group(1)]
+    if re.fullmatch(r"Ethernet\d+(?:/\d+){0,2}", name):
+        return "other"   # EOS names carry no speed; a model read from a switch keeps its real types
     raise FabricError(f"unknown interface name format: {name!r}")
 
 
@@ -58,10 +60,11 @@ class MlagTrunk:
     trunk: int
     # The same member ports on both leaves.
     members: tuple[str, ...]
+    vendor: str = VENDOR
 
     @property
     def name(self) -> str:
-        return naming.trunk(VENDOR, self.trunk)
+        return naming.trunk(self.vendor, self.trunk)
 
 
 @dataclass(frozen=True)
@@ -75,10 +78,11 @@ class LeafPair:
     # The same port names on both leaves, cabled port to port.
     peer_link_members: tuple[str, ...]
     mlag_trunks: tuple[MlagTrunk, ...] = ()
+    vendor: str = VENDOR
 
     @property
     def peer_link_name(self) -> str:
-        return naming.trunk(VENDOR, self.peer_link_trunk)
+        return naming.trunk(self.vendor, self.peer_link_trunk)
 
 
 @dataclass(frozen=True)
@@ -102,6 +106,7 @@ class Services:
     # Anycast gateway MAC, the same on every VBDIF of the fabric.
     gateway_mac: str | None = None
     architecture: str = "symmetric"
+    vendor: str = VENDOR   # Annet's name: "huawei" or "arista"
     # Centralized only: the M-LAG pair that holds the gateways (names sorted).
     gateway_pair: tuple[str, str] | None = None
 
@@ -116,6 +121,8 @@ class Services:
         if self.gateway_mac is not None:
             fabric["gateway_mac"] = self.gateway_mac
         fabric["architecture"] = self.architecture
+        if self.vendor != VENDOR:   # absent means Huawei: existing fabrics' contexts stay as they are
+            fabric["vendor"] = self.vendor
         if self.gateway_pair is not None:
             fabric["gateway_pair"] = list(self.gateway_pair)
         return {"fabric": fabric}
@@ -141,6 +148,10 @@ class Fabric:
     # The PIP layout (an imported fabric): each M-LAG switch's PIP on LoopBack1 from here,
     # the pair's VTEP on LoopBack2 (generators/fabric.py pip_layout).
     pip_prefix: ipaddress.IPv4Network | None = None
+
+    @property
+    def vendor(self) -> str:
+        return self.services.vendor
 
     @property
     def mlag_pairs(self) -> tuple[LeafPair, ...]:
@@ -189,7 +200,7 @@ def _interface(value: str, what: str) -> ipaddress.IPv4Interface:
     return address
 
 
-def _pair(p: dict, devices: str, role: str) -> LeafPair:
+def _pair(p: dict, devices: str, role: str, vendor: str = VENDOR) -> LeafPair:
     return LeafPair(
         leaves=tuple(p[devices]),
         model=p.get("model", ""),
@@ -197,8 +208,9 @@ def _pair(p: dict, devices: str, role: str) -> LeafPair:
         peer_link_trunk=int(p["peer_link"]["trunk"]),
         peer_link_members=tuple(p["peer_link"]["members"]),
         mlag_trunks=tuple(
-            MlagTrunk(trunk=int(t["trunk"]), members=tuple(t["members"])) for t in p.get("mlag_trunks") or []
+            MlagTrunk(trunk=int(t["trunk"]), members=tuple(t["members"]), vendor=vendor) for t in p.get("mlag_trunks") or []
         ),
+        vendor=vendor,
     )
 
 
@@ -207,6 +219,9 @@ def _build(data: dict) -> Fabric:
     prefixes = fabric["prefixes"]
     services = data["services"]
     snmp = services.get("snmp") or {}
+    vendor = str(fabric.get("vendor") or VENDOR)
+    if vendor not in naming.VENDORS:
+        raise FabricError(f"fabric.vendor must be one of {list(naming.VENDORS)}, got {vendor!r}")
     return Fabric(
         name=fabric["name"],
         asn=int(fabric["asn"]),
@@ -219,8 +234,8 @@ def _build(data: dict) -> Fabric:
         gateways_prefix=_network(prefixes["gateways"], "gateways prefix") if "gateways" in prefixes else None,
         pip_prefix=_network(prefixes["pip"], "pip prefix") if prefixes.get("pip") else None,
         spines=tuple(Spine(name=s["name"], model=s["model"]) for s in data["spines"]),
-        leaf_pairs=tuple(_pair({"model": p["model"], **p}, "leaves", p.get("role", "leaf")) for p in data["leaf_pairs"]),
-        spine_pair=_pair(data["spine_pair"], "spines", "spine") if data.get("spine_pair") else None,
+        leaf_pairs=tuple(_pair({"model": p["model"], **p}, "leaves", p.get("role", "leaf"), vendor) for p in data["leaf_pairs"]),
+        spine_pair=_pair(data["spine_pair"], "spines", "spine", vendor) if data.get("spine_pair") else None,
         links=tuple(
             Link(spine=l["spine"], spine_port=l["spine_port"], leaf=l["leaf"], leaf_port=l["leaf_port"])
             for l in data["links"]
@@ -233,14 +248,25 @@ def _build(data: dict) -> Fabric:
             mlag_bypass_vlan=(int(fabric["mlag"]["bypass_vlan"]) if fabric.get("mlag") else None),
             gateway_mac=fabric.get("gateway_mac"),
             architecture=str(fabric.get("architecture", "symmetric")),
+            vendor=vendor,
             gateway_pair=tuple(sorted(fabric["gateway_pair"])) if fabric.get("gateway_pair") else None,
         ),
     )
 
 
+def check_models(vendor: str, models) -> None:
+    """A fabric is one vendor: every model of it must be that vendor's."""
+    from seed.ports import vendor_of_model   # seed.ports reads interface types from here
+
+    other = sorted({m for m in models if m and vendor_of_model(m) != vendor})
+    if other:
+        raise FabricError(f"a {vendor} fabric takes {vendor} switches only: {', '.join(other)} is not one")
+
+
 def _validate(fabric: Fabric, settings_only: bool = False) -> None:
     if not 1 <= fabric.asn <= 4294967295:
         raise FabricError(f"ASN out of range: {fabric.asn}")
+    check_models(fabric.vendor, [s.model for s in fabric.spines] + [p.model for p in fabric.mlag_pairs])
 
     pools = {
         "loopback": fabric.loopback_prefix,

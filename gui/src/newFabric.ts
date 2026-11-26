@@ -7,6 +7,7 @@ export interface SettingsDraft {
   name: string;
   asn: string;
   architecture: "symmetric" | "centralized";
+  vendor: "huawei" | "arista"; // a fabric is one vendor; the models offered follow it
   supernet: string;
   prefixes: Pools | null; // null until an address plan is proposed
   bypassVlan: string;
@@ -18,7 +19,7 @@ export interface SettingsDraft {
 }
 
 export const emptySettings = (): SettingsDraft => ({
-  name: "", asn: "", architecture: "symmetric", supernet: "10.0.0.0/16", prefixes: null, bypassVlan: "4093",
+  name: "", asn: "", architecture: "symmetric", vendor: "huawei", supernet: "10.0.0.0/16", prefixes: null, bypassVlan: "4093",
   gatewayMac: "", ntpServers: "", ntpVpn: "", snmpLocation: "", snmpContact: "",
 });
 
@@ -63,7 +64,7 @@ export function settingsProblem(s: SettingsDraft, existing: string[]): string | 
 export function toSettings(s: SettingsDraft): NewFabricSettings {
   const ntp = s.ntpServers.split(/[\s,]+/).filter(Boolean);
   return {
-    name: s.name.trim(), asn: Number(s.asn), architecture: s.architecture, prefixes: s.prefixes!,
+    name: s.name.trim(), asn: Number(s.asn), architecture: s.architecture, vendor: s.vendor, prefixes: s.prefixes!,
     bypass_vlan: Number(s.bypassVlan), gateway_mac: s.gatewayMac.trim(), ntp_servers: ntp,
     ntp_vpn_instance: ntp.length && s.ntpVpn.trim() ? s.ntpVpn.trim() : null,
     snmp_location: s.snmpLocation.trim() || null, snmp_contact: s.snmpContact.trim() || null,

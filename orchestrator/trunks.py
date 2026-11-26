@@ -16,6 +16,7 @@ import re
 from orchestrator.netbox import NetBoxClient
 from orchestrator.segments import MLAG_TAG, PEER_LINK_TAG, UNNUMBERED_TAG, SegmentError, Segments, _cf, _ref_id
 from generators import naming
+from seed import ports as seed_ports
 
 # Eth-Trunk numbers offered here. The CE6881H's own range is unverified; this stays inside it
 # (the lab test covers what is used).
@@ -132,7 +133,7 @@ class Trunks:
         if len(set(members)) != len(members):
             raise SegmentError("a member port is listed twice")
         device = await self._device(name)
-        trunk = naming.trunk(naming.HUAWEI, number)   # shortcut: Huawei only until a fabric names its vendor (ROADMAP, Arista step 2)
+        trunk = naming.trunk(seed_ports.vendor_of_model((device.get("device_type") or {}).get("model")), number)
         devices = [device]
         if mlag:
             peer = await self._peer(device)
