@@ -7,10 +7,10 @@ name = "diffplane-orchestrator"
 version = "0.1.0"
 requires-python = ">=3.12"
 dependencies = [
-    "fastapi>=0.163.2",
+    "fastapi>=0.165.0",
     "httpx>=0.28.1",
     "uvicorn>=0.54.0",
-    "pyyaml>=6.0.3",
+    "pyyaml>=6.0.4",
     # Pinned: generator output and patch behaviour depend on the exact Annet rulebook.
     "annet[netbox]==4.6.14",
     "gnetcli_adapter==2.8.5",
