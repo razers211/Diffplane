@@ -118,7 +118,7 @@ services:
 
   # Shared by NetBox (DB 0 tasks, DB 1 cache) and, later, the orchestrator's job queue.
   redis:
-    image: docker.io/valkey/valkey:8.1-alpine@sha256:2602ace2be6569bc2bbb06f873776516ab9089821525be34f4305c67eb9db02a
+    image: docker.io/valkey/valkey:9.1-alpine@sha256:56729e68bdda139cbd3f6a2538683dc3523325fc5711ea1a379938f1b37893f0
     command:
       - sh
       - -c
